@@ -6,48 +6,8 @@
 // how often to send an uplink - consider legal & FUP constraints - see notes
 const uint32_t uplinkIntervalSeconds = 20UL;    // minutes x seconds
 
-// #define RADIOLIB_LORAWAN_JOIN_EUI  0x0000000000000000
-// #ifndef RADIOLIB_LORAWAN_DEV_EUI   
-// #define RADIOLIB_LORAWAN_DEV_EUI   0x4a0b13d21648b66c
-// #endif
-// #ifndef RADIOLIB_LORAWAN_APP_KEY   // Replace with your App Key 
-// #define RADIOLIB_LORAWAN_APP_KEY   0x9a, 0x6f, 0x20, 0x59, 0x2e, 0xf9, 0xde, 0x40, 0x94, 0xad, 0xa9, 0x54, 0x2d, 0x2f, 0x66, 0x7b
-// #endif
-// //7ec326d11919fb7aec532d954742d87a
-// #ifndef RADIOLIB_LORAWAN_NWK_KEY   // Put your Nwk Key here
-// #define RADIOLIB_LORAWAN_NWK_KEY   0x7e, 0xc3, 0x26, 0xd1, 0x19, 0x19, 0xfb, 0x7a, 0xec, 0x53, 0x2d, 0x95, 0x47, 0x42, 0xd8, 0x7a
-// #endif
-// //de9d5d3a7ed5b60be234a24f806e67ed
-
-#ifndef RADIOLIB_LORAWAN_DEV_ADDR   
-#define RADIOLIB_LORAWAN_DEV_ADDR   0x00bfe104
-#endif
-#ifndef RADIOLIB_LORAWAN_FNWKSINT_KEY   
-#define RADIOLIB_LORAWAN_FNWKSINT_KEY   0x63, 0x67, 0x7a, 0x0e, 0xc1, 0x28, 0x7b, 0x82, 0x92, 0xc5, 0x0b, 0xa1, 0x3d, 0xd6, 0xd2, 0x25
-#endif
-#ifndef RADIOLIB_LORAWAN_SNWKSINT_KEY   
-#define RADIOLIB_LORAWAN_SNWKSINT_KEY   0xdd, 0x14, 0x59, 0xab, 0x63, 0x6e, 0x50, 0x0d, 0x8a, 0x75, 0x77, 0xa8, 0x75, 0x28, 0xc9, 0x01
-#endif
-#ifndef RADIOLIB_LORAWAN_NWKSENC_KEY   
-#define RADIOLIB_LORAWAN_NWKSENC_KEY   0x64, 0x13, 0xe3, 0x99, 0x91, 0xf0, 0x87, 0x56, 0x99, 0xc9, 0xbd, 0x8c, 0x72, 0x07, 0x8f, 0x9e
-#endif
-#ifndef RADIOLIB_LORAWAN_APPS_KEY   
-#define RADIOLIB_LORAWAN_APPS_KEY   0xee, 0xf1, 0x30, 0x98, 0x6a, 0x11, 0x4e, 0x69, 0xd0, 0xde, 0x8a, 0xdc, 0xd6, 0x8d, 0x28, 0xa6
-#endif
-
 const LoRaWANBand_t Region = US915;
 const uint8_t subBand = 2;  // For US915, change this to 2, otherwise leave on 0
-
-// uint64_t joinEUI =   RADIOLIB_LORAWAN_JOIN_EUI;
-// uint64_t devEUI  =   RADIOLIB_LORAWAN_DEV_EUI;
-// uint8_t appKey[] = { RADIOLIB_LORAWAN_APP_KEY };
-// uint8_t nwkKey[] = { RADIOLIB_LORAWAN_NWK_KEY };
-
-uint32_t devAddr =        RADIOLIB_LORAWAN_DEV_ADDR;
-uint8_t fNwkSIntKey[] = { RADIOLIB_LORAWAN_FNWKSINT_KEY };
-uint8_t sNwkSIntKey[] = { RADIOLIB_LORAWAN_SNWKSINT_KEY };
-uint8_t nwkSEncKey[] =  { RADIOLIB_LORAWAN_NWKSENC_KEY };
-uint8_t appSKey[] =     { RADIOLIB_LORAWAN_APPS_KEY };
 
 // result code to text ...
 String stateDecode(const int16_t result) {

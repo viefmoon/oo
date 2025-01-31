@@ -27,11 +27,6 @@ extern ADS131M08 adc;
 extern MAX31865_RTD rtd;
 extern OneWire oneWire;
 extern DallasTemperature dallasTemp;
-
-// Arreglo de configuración de sensores y su tamaño
-extern SensorConfig sensorConfigs[];
-extern const size_t NUM_SENSORS;
-
 /**
  * @brief Clase estática que maneja la inicialización y lecturas de todos los sensores.
  */
@@ -66,6 +61,8 @@ class SensorManager {
      * @return true si la lectura fue exitosa, false si hubo timeout
      */
     static bool updateADCReadings(uint32_t timeout_ms = 1000);
+
+    static float readBatteryVoltage();
 
   private:
     // Funciones internas para leer cada tipo de sensor

@@ -13,23 +13,20 @@ enum SensorType {
     CONDUCTIVITY_SENSOR,
     CONDENSATION_HUMIDITY_SENSOR,
     SOIL_HUMIDITY_SENSOR,
-    VOLTAGE_SENSOR
-
 };
 
 struct SensorConfig {
+    char configKey[20];
     char sensorId[20];
-    char sensorName[20];
     SensorType type;
     uint8_t adcNumber;
     uint8_t channel;
     char tempSensorId[20]; 
-    char enable[20];
+    bool enable;
 };
 
 struct SensorReading {
     char sensorId[20];
-    char sensorName[20];
     SensorType type;
     float value;
     uint32_t timestamp;

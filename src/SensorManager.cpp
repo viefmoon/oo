@@ -8,10 +8,7 @@
 #include "sensor_types.h"
 #include "config.h"
 #include <Preferences.h>
-#include "config_calib.h"
 #include "config_manager.h"
-
-
 
 // =============== Implementaciones de los métodos de SensorManager ===============
 
@@ -69,21 +66,19 @@ void SensorManager::initializeSPIPins() {
 }
 
 // ========== Funciones de conversión ==========
-float convertNTC100K(float voltage) {
-    // Obtener valores de calibración usando ConfigManager
-    double T1, R1, T2, R2, T3, R3;
-    ConfigManager::getNTC100KConfig(T1, R1, T2, R2, T3, R3);
-    
-    // Convertir temperaturas a Kelvin para cálculos
+
+// Se crea una función auxiliar para unificar la conversión en sensores NTC (ambos 100K y 10K)
+// La función recibe el voltaje medido y los parámetros de calibración (T1, R1, T2, R2, T3, R3)
+static float convertNTCGeneric(float voltage, double T1, double R1, double T2, double R2, double T3, double R3) {
+    // Convertir temperaturas a Kelvin
     const double T1K = T1 + 273.15;
     const double T2K = T2 + 273.15;
     const double T3K = T3 + 273.15;
     
-    // El voltaje medido es (V_rama_izq - V_rama_der)
-    // Cuando NTC = 100k: V_diff = 0 → R_ntc = 100k
+    // El voltaje medido es diferencial
     double V_diff = voltage; // Ya viene como diferencial
     
-    // Fórmula corregida para puente balanceado:
+    // Fórmula para puente balanceado (se asume que el punto medio es 3.3/2.0)
     double R_ntc = R1 * (3.3/2.0 - V_diff) / (3.3/2.0 + V_diff);
     
     // Cálculo de coeficientes Steinhart-Hart
@@ -91,64 +86,35 @@ float convertNTC100K(float voltage) {
     const double L2 = log(R2);
     const double L3 = log(R3);
     
-    const double Y1 = 1.0/T1K;
-    const double Y2 = 1.0/T2K;
-    const double Y3 = 1.0/T3K;
+    const double Y1 = 1.0 / T1K;
+    const double Y2 = 1.0 / T2K;
+    const double Y3 = 1.0 / T3K;
     
-    const double gamma2 = (Y2 - Y1)/(L2 - L1);
-    const double gamma3 = (Y3 - Y1)/(L3 - L1);
+    const double gamma2 = (Y2 - Y1) / (L2 - L1);
+    const double gamma3 = (Y3 - Y1) / (L3 - L1);
     
-    const double C = (gamma3 - gamma2)/(L3 - L2) * (1.0/(L1 + L2 + L3));
-    const double B = gamma2 - C*(pow(L1,2) + L1*L2 + pow(L2,2));
-    const double A = Y1 - L1*(B + C*pow(L1,2));
+    const double C_coef = (gamma3 - gamma2) / (L3 - L2) * (1.0 / (L1 + L2 + L3));
+    const double B_coef = gamma2 - C_coef * (pow(L1,2) + L1 * L2 + pow(L2,2));
+    const double A_coef = Y1 - L1 * (B_coef + C_coef * pow(L1,2));
     
-    // Aplicar ecuación de Steinhart-Hart completa
+    // Aplicar la ecuación Steinhart-Hart
     const double lnR = log(R_ntc);
-    const double invT = A + B*lnR + C*pow(lnR,3);
-    const double temperature = (1.0/invT) - 273.15;  // Convertir a °C
-    
-    return (float)temperature;
+    const double invT = A_coef + B_coef * lnR + C_coef * pow(lnR, 3);
+    float temperature = (1.0f / invT) - 273.15f;
+    return temperature;
+}
+
+float convertNTC100K(float voltage) {
+    double T1, R1, T2, R2, T3, R3;
+    ConfigManager::getNTC100KConfig(T1, R1, T2, R2, T3, R3);
+    return convertNTCGeneric(voltage, T1, R1, T2, R2, T3, R3);
 }
 
 float convertNTC10K(float voltage) {
     // Obtener valores de calibración usando ConfigManager
     double T1, R1, T2, R2, T3, R3;
     ConfigManager::getNTC10KConfig(T1, R1, T2, R2, T3, R3);
-    
-    // Convertir temperaturas a Kelvin para cálculos
-    const double T1K = T1 + 273.15;
-    const double T2K = T2 + 273.15;
-    const double T3K = T3 + 273.15;
-    
-    // El voltaje medido es (V_rama_izq - V_rama_der)
-    // Cuando NTC = 10k: V_diff = 0 → R_ntc = 10k
-    double V_diff = voltage; // Ya viene como diferencial
-    
-    // Fórmula corregida para puente balanceado:
-    double R_ntc = R1 * (3.3/2.0 - V_diff) / (3.3/2.0 + V_diff);
-    
-    // Cálculo de coeficientes Steinhart-Hart
-    const double L1 = log(R1);
-    const double L2 = log(R2);
-    const double L3 = log(R3);
-    
-    const double Y1 = 1.0/T1K;
-    const double Y2 = 1.0/T2K;
-    const double Y3 = 1.0/T3K;
-    
-    const double gamma2 = (Y2 - Y1)/(L2 - L1);
-    const double gamma3 = (Y3 - Y1)/(L3 - L1);
-    
-    const double C = (gamma3 - gamma2)/(L3 - L2) * (1.0/(L1 + L2 + L3));
-    const double B = gamma2 - C*(pow(L1,2) + L1*L2 + pow(L2,2));
-    const double A = Y1 - L1*(B + C*pow(L1,2));
-    
-    // Aplicar ecuación de Steinhart-Hart completa
-    const double lnR = log(R_ntc);
-    const double invT = A + B*lnR + C*pow(lnR,3);
-    const double temperature = (1.0/invT) - 273.15;  // Convertir a °C
-    
-    return (float)temperature;
+    return convertNTCGeneric(voltage, T1, R1, T2, R2, T3, R3);
 }
 
 float convertHDS10(float voltage) {
@@ -236,26 +202,6 @@ float convertPH(float voltage, float solutionTemp) {
         Serial.println("Advertencia: Usando temperatura de calibración por defecto para pH");
     }
 
-    // Imprimir estado de calibración
-    Serial.println("Estado de calibración pH:");
-    Serial.print("TEMP_CAL: "); 
-    Serial.println(TEMP_CAL);
-    Serial.println("Punto 1:");
-    Serial.print("V1: "); 
-    Serial.println(V1);
-    Serial.print("T1: "); 
-    Serial.println(T1);
-    Serial.println("Punto 2:");
-    Serial.print("V2: "); 
-    Serial.println(V2);
-    Serial.print("T2: "); 
-    Serial.println(T2);
-    Serial.println("Punto 3:");
-    Serial.print("V3: "); 
-    Serial.println(V3);
-    Serial.print("T3: "); 
-    Serial.println(T3);
-
     // Datos de calibración (pH, voltaje)
     const double pH_calib[] = {T1, T2, T3};
     const double V_calib[] = {V1, V2, V3};
@@ -309,32 +255,29 @@ bool SensorManager::updateADCReadings(uint32_t timeout_ms) {
             
             // Imprimir valores crudos para debug
             Serial.println("Lectura ADC completa:");
-            for(int i = 0; i < 8; i++) {
+            for (int i = 0; i < 8; i++) {
                 Serial.print("Canal ");
                 Serial.print(i);
                 Serial.print(": ");
                 Serial.print(lastAdcReading.ch[i].f, 8);
                 Serial.println(" V");
             }
-            
             return true;
         }
-        delay(1); // Pequeña pausa para no saturar el CPU
+        yield(); // Permitir que se ejecuten otras tareas en vez de busy-wait
     }
     
     // Si llegamos aquí, hubo timeout
     Serial.println("Timeout en lectura ADC - usando valores 0V");
-    for(int i = 0; i < 8; i++) {
+    for (int i = 0; i < 8; i++) {
         lastAdcReading.ch[i].f = 0.0f;
     }
     return false;
 }
 
 float SensorManager::readAnalogSensor(const SensorConfig &cfg) {
-    // Usar el valor almacenado del último updateADCReadings()
     float rawValue = lastAdcReading.ch[cfg.channel].f;
     
-    // Aplicar conversión según el tipo de sensor
     switch(cfg.type) {
         case NTC_100K_TEMPERATURE_SENSOR:
             return convertNTC100K(rawValue);
@@ -343,10 +286,10 @@ float SensorManager::readAnalogSensor(const SensorConfig &cfg) {
         case PH_SENSOR: {
             float solutionTemp = NAN;
             if(strlen(cfg.tempSensorId) > 0) {
-                // Buscar el sensor de temperatura asociado
-                for(size_t i = 0; i < NUM_SENSORS; i++) {
-                    if(strcmp(sensorConfigs[i].sensorId, cfg.tempSensorId) == 0) {
-                        solutionTemp = getSensorReading(sensorConfigs[i]).value;
+                auto sensors = ConfigManager::getAllSensorConfigs();
+                for(const auto& sensor : sensors) {
+                    if(strcmp(sensor.sensorId, cfg.tempSensorId) == 0) {
+                        solutionTemp = getSensorReading(sensor).value;
                         break;
                     }
                 }
@@ -356,10 +299,10 @@ float SensorManager::readAnalogSensor(const SensorConfig &cfg) {
         case CONDUCTIVITY_SENSOR: {
             float solutionTemp = NAN;
             if(strlen(cfg.tempSensorId) > 0) {
-                // Buscar el sensor de temperatura asociado
-                for(size_t i = 0; i < NUM_SENSORS; i++) {
-                    if(strcmp(sensorConfigs[i].sensorId, cfg.tempSensorId) == 0) {
-                        solutionTemp = getSensorReading(sensorConfigs[i]).value;
+                auto sensors = ConfigManager::getAllSensorConfigs();
+                for(const auto& sensor : sensors) {
+                    if(strcmp(sensor.sensorId, cfg.tempSensorId) == 0) {
+                        solutionTemp = getSensorReading(sensor).value;
                         break;
                     }
                 }
@@ -371,8 +314,6 @@ float SensorManager::readAnalogSensor(const SensorConfig &cfg) {
 
         case CONDENSATION_HUMIDITY_SENSOR: 
             return convertHDS10(rawValue);
-        case VOLTAGE_SENSOR:
-            return convertBattery(rawValue);
         default:
             Serial.print("Tipo de sensor no manejado: ");
             Serial.println(cfg.type);
@@ -410,11 +351,10 @@ float SensorManager::readSensorValue(const SensorConfig &cfg) {
         case CONDUCTIVITY_SENSOR: 
         case SOIL_HUMIDITY_SENSOR:
         case CONDENSATION_HUMIDITY_SENSOR:
-        case VOLTAGE_SENSOR:
-            return readAnalogSensor(cfg);
         case RTD_TEMPERATURE_SENSOR:
             return readRtdSensor();
         case DS18B20_TEMPERATURE_SENSOR:
+
             return readDallasSensor();
         default:
             return 0.0;
@@ -424,35 +364,40 @@ float SensorManager::readSensorValue(const SensorConfig &cfg) {
 SensorReading SensorManager::getSensorReading(const SensorConfig &cfg) {
     SensorReading reading;
     strncpy(reading.sensorId, cfg.sensorId, sizeof(reading.sensorId) - 1);
-    strncpy(reading.sensorName, cfg.sensorName, sizeof(reading.sensorName) - 1);
 
     reading.type = cfg.type;
     reading.timestamp = rtcManager.getEpochTime();
 
-    // Si es un sensor analógico y no tenemos lectura válida del ADC, actualizar
+    // Para sensores analógicos, se solicita la lectura del ADC si todavía no se tengo datos válidos
     if ((cfg.type == NTC_100K_TEMPERATURE_SENSOR || 
          cfg.type == NTC_10K_TEMPERATURE_SENSOR || 
-         cfg.type == WATER_NTC_10K_TEMPERATURE_SENSOR||
+         cfg.type == WATER_NTC_10K_TEMPERATURE_SENSOR ||
          cfg.type == PH_SENSOR || 
          cfg.type == CONDUCTIVITY_SENSOR || 
          cfg.type == SOIL_HUMIDITY_SENSOR || 
-         cfg.type == CONDENSATION_HUMIDITY_SENSOR || 
-         cfg.type == VOLTAGE_SENSOR) && 
-        !adcReadingValid) {
+         cfg.type == CONDENSATION_HUMIDITY_SENSOR) && !adcReadingValid) {
         updateADCReadings(1000);
     }
 
     reading.value = readSensorValue(cfg);
 
-    // Debug print
+    // Debug: Imprimir información de la lectura
     Serial.print("Lectura sensor - ID: ");
     Serial.print(reading.sensorId);
-    Serial.print(" | Nombre: ");
-    Serial.print(reading.sensorName);
     Serial.print(" | Valor: ");
     Serial.print(reading.value, 2);
     Serial.print(" | Timestamp: ");
     Serial.println(reading.timestamp);
 
     return reading;
+}
+
+float SensorManager::readBatteryVoltage() {
+    // Asegurarse de tener una lectura ADC actualizada
+    if (!adcReadingValid) {
+        updateADCReadings(1000);
+    }
+    // Se utiliza un canal fijo para la lectura de voltaje, definido como BATTERY_ADC_CHANNEL
+    float rawValue = lastAdcReading.ch[BATTERY_ADC_CHANNEL].f;
+    return convertBattery(rawValue);
 }

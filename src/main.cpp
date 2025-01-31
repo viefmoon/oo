@@ -1,20 +1,29 @@
+/*******************************************************************************************
+ * Archivo: src/main.cpp
+ * Descripción: Código principal para el ESP32 que configura los sensores, radio LoRa, BLE y
+ * entra en modo Deep Sleep. Se incluye inicialización de hardware y manejo de configuraciones.
+ *******************************************************************************************/
+
 #include <Arduino.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <Preferences.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <vector>
+
+// Bibliotecas específicas del proyecto
 #include "config.h"
 #include "PowerManager.h"
-#include "Wire.h"
-#include "SPI.h"
 #include "MAX31865.h"
 #include <RadioLib.h>
 #include "RTCManager.h"
-#include <OneWire.h>
-#include <DallasTemperature.h>
 #include "sensor_types.h"
 #include "SensirionI2cSht4x.h"
 #include "SensorManager.h"
 #include "LoraConfig.h"
 #include "ADS131M08.h"
 #include "LoRaWAN_ESP32.h"
-#include <Preferences.h>
 #include "nvs_flash.h"
 #include "esp_sleep.h"
 #include <BLEDevice.h>
@@ -22,26 +31,50 @@
 #include <BLEAdvertising.h>
 #include "config_manager.h"
 #include "ble_config_callbacks.h"
+#include "utilities.h"
 
-// Declaración de función
+/*-------------------------------------------------------------------------------------------------
+   Declaración de funciones
+-------------------------------------------------------------------------------------------------*/
+/**
+ * @brief Configura el servicio BLE y sus características.
+ * @param pServer Puntero al servidor BLE.
+ * @return Puntero al servicio BLE creado.
+ */
 BLEService* setupBLEService(BLEServer* pServer);
 
-// ====== Objetos Globales ======
-Preferences preferences;  // Declaración global de preferences
-uint32_t frameCounter;   // Declaración global del contador
-uint32_t timeToSleep;  // Declaración global del tiempo de sleep
+/**
+ * @brief Configura el ESP32 para entrar en deep sleep.
+ */
+void goToDeepSleep();
+
+/**
+ * @brief Verifica si se mantuvo presionado el botón de configuración y activa el modo BLE.
+ */
+void checkConfigMode();
+
+/**
+ * @brief Inicializa el bus I2C, la expansión de I/O y el PowerManager.
+ */
+void initHardware();
+
+/*-------------------------------------------------------------------------------------------------
+   Objetos Globales y Variables
+-------------------------------------------------------------------------------------------------*/
+Preferences preferences;       // Almacenamiento de preferencias en NVS
+uint32_t frameCounter;         // Contador de tramas enviadas
+uint32_t timeToSleep;          // Tiempo en segundos para deep sleep
 
 RTCManager rtcManager;
 PCA9555 ioExpander(I2C_ADDRESS_PCA9555, I2C_SDA_PIN, I2C_SCL_PIN);
 PowerManager powerManager(ioExpander);
 
 SPIClass spi(FSPI);
-SPISettings spiAdcSettings(100000, MSBFIRST, SPI_MODE1);
-SPISettings spiRtdSettings(1000000, MSBFIRST, SPI_MODE1);
-SPISettings spiRadioSettings(100000, MSBFIRST, SPI_MODE0);
+SPISettings spiAdcSettings(SPI_ADC_CLOCK, MSBFIRST, SPI_MODE1);
+SPISettings spiRtdSettings(SPI_RTD_CLOCK, MSBFIRST, SPI_MODE1);
+SPISettings spiRadioSettings(SPI_RADIO_CLOCK, MSBFIRST, SPI_MODE0);
 
 ADS131M08 adc(ioExpander, spi, spiAdcSettings);
-
 MAX31865_RTD rtd(MAX31865_RTD::RTD_PT100, spi, spiRtdSettings, ioExpander, PT100_CS_PIN);
 
 SX1262 radio = new Module(LORA_NSS_PIN, LORA_DIO1_PIN, LORA_RST_PIN, LORA_BUSY_PIN, spi, spiRadioSettings);
@@ -50,56 +83,37 @@ LoRaWANNode node(&radio, &Region, subBand);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature dallasTemp(&oneWire);
 
-// ====== Declaración de sensores (ejemplo) ======
-SensorConfig sensorConfigs[] = {
-    // --- ADC (8 canales) ---
-    {"NTC0", "Temperatura_NTC0", NTC_100K_TEMPERATURE_SENSOR, 1, 0, "", false},
-    {"NTC1", "Temperatura_NTC1", NTC_100K_TEMPERATURE_SENSOR, 1, 1, "", false},
-    {"HDS10", "Humedad_HDS10", CONDENSATION_HUMIDITY_SENSOR, 1, 2, "", false},
-    {"SUELO1", "Humedad_Suelo1", SOIL_HUMIDITY_SENSOR, 1, 3, "", false},
-    {"SUELO2", "Humedad_Suelo2", SOIL_HUMIDITY_SENSOR, 1, 4, "", false},
-    {"CONDUCTIVITY", "Conductividad_Agua", CONDUCTIVITY_SENSOR, 1, 5, "NTC0", false},
-    {"BATT", "Voltaje_Bateria", VOLTAGE_SENSOR, 1, 6, "", false},
-    {"PH", "PH_Sensor", PH_SENSOR, 1, 7, "NTC0", false},
-    
-    // --- RTD (PT100) ---
-    {"PT100", "Temperatura_PT100", RTD_TEMPERATURE_SENSOR, 0, 0, "", false},
-    
-    // --- DS18B20 ---
-    {"DS18B20", "Temperatura_DS18B20", DS18B20_TEMPERATURE_SENSOR, 0, 0, "", false}
-};
-
-// Para calcular el número de sensores
-const size_t NUM_SENSORS = sizeof(sensorConfigs) / sizeof(sensorConfigs[0]);
+/*-------------------------------------------------------------------------------------------------
+   Implementación de Funciones
+-------------------------------------------------------------------------------------------------*/
 
 /**
- * @brief Configura el ESP32 para entrar en deep sleep por TIME_TO_SLEEP_SECONDS.
+ * @brief Entra en modo deep sleep después de apagar periféricos y poner en reposo el módulo LoRa.
  */
 void goToDeepSleep() {
     Serial.println("Entrando en Deep Sleep...");
     Serial.flush();
     
+    // Configurar el temporizador y GPIO para despertar
     esp_sleep_enable_timer_wakeup(timeToSleep * 1000000ULL);
-    
-    // Configurar el tipo de interrupción para el pin de configuración
     gpio_wakeup_enable((gpio_num_t)CONFIG_PIN, GPIO_INTR_LOW_LEVEL);
     esp_sleep_enable_gpio_wakeup();
     esp_deep_sleep_enable_gpio_wakeup(BIT(CONFIG_PIN), ESP_GPIO_WAKEUP_GPIO_LOW);
     
-    // Apagar todos los reguladores
+    // Apagar todos los reguladores y módulos innecesarios
     powerManager.allPowerOff();
-    
-    // Poner el módulo LoRa en modo sleep (cold start)
     radio.sleep(false);
-    
     btStop();
     Wire.end();
     spi.end();
     
-    // Entrar en deep sleep
     esp_deep_sleep_start();
 }
 
+/**
+ * @brief Comprueba si se ha activado el modo configuración mediante un pin.
+ *        Si el botón de configuración se mantiene presionado el tiempo definido, activa BLE.
+ */
 void checkConfigMode() {
     if (digitalRead(CONFIG_PIN) == LOW) {
         unsigned long startTime = millis();
@@ -108,27 +122,26 @@ void checkConfigMode() {
             if (millis() - startTime >= CONFIG_TRIGGER_TIME) {
                 Serial.println("Modo configuración activado");
                 
-                // Inicializar preferences aquí para asegurar que está abierto
-                preferences.begin("lorawan", false);
+                // Inicializar BLE y crear servicio de configuración
+                // Se cambia el nombre del dispositivo BLE a "SENSOR_DEV" concatenado con loraConfig.devAddr
+                LoRaConfig loraConfig = ConfigManager::getLoRaConfig();
+                String bleName = "SENSOR_DEV" + String(loraConfig.devAddr);
+                BLEDevice::init(bleName.c_str());
                 
-                // Inicializar BLE
-                BLEDevice::init("ESP32_Config");
                 BLEServer *pServer = BLEDevice::createServer();
-                
-                // Crear servicio BLE y obtener referencia
                 BLEService *pService = setupBLEService(pServer);
                 
-                // Configurar advertising
+                // Configurar publicidad BLE
                 BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
-                pAdvertising->addServiceUUID(pService->getUUID()); // Usar el servicio creado directamente
+                pAdvertising->addServiceUUID(pService->getUUID());
                 pAdvertising->setScanResponse(true);
-                pAdvertising->setMinPreferred(0x06);  // funciones que ayudan con iPhone conexiones problema
+                pAdvertising->setMinPreferred(0x06);
                 pAdvertising->setMinPreferred(0x12);
                 pAdvertising->start();
                 
                 Serial.println("BLE activado - Usa una app para leer/escribir el tiempo de sleep");
                 
-                // Bucle de parpadeo
+                // Bucle de parpadeo del LED de configuración
                 while (true) {
                     ioExpander.digitalWrite(CONFIG_LED_PIN, HIGH);
                     delay(500);
@@ -140,75 +153,77 @@ void checkConfigMode() {
     }
 }
 
+/**
+ * @brief Crea y configura el servicio BLE con sus respectivas características para configuración.
+ * 
+ * @param pServer Puntero al servidor BLE.
+ * @return BLEService* Puntero al servicio creado.
+ */
 BLEService* setupBLEService(BLEServer* pServer) {
-    // Crear servicio de configuración
-    BLEService *pService = pServer->createService(BLEUUID((uint16_t)0x180A));
+    // Crear servicio de configuración usando el UUID definido en config.h
+    BLEService *pService = pServer->createService(BLEUUID(BLE_SERVICE_UUID));
 
     // Característica para tiempo de sleep
     BLECharacteristic *pSleepChar = pService->createCharacteristic(
-        BLEUUID("2A37"),  // UUID personalizado para sleep time
+        BLEUUID(BLE_CHAR_SLEEP_UUID),
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
     );
     pSleepChar->setCallbacks(new SleepConfigCallback());
 
     // Característica para configuración NTC 100K
     BLECharacteristic *pNTC100KChar = pService->createCharacteristic(
-        BLEUUID("2A38"),  // UUID personalizado para NTC 100K
+        BLEUUID(BLE_CHAR_NTC100K_UUID),
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
     );
     pNTC100KChar->setCallbacks(new NTC100KConfigCallback());
 
     // Característica para configuración NTC 10K
     BLECharacteristic *pNTC10KChar = pService->createCharacteristic(
-        BLEUUID("2A39"),  // UUID personalizado para NTC 10K
+        BLEUUID(BLE_CHAR_NTC10K_UUID),
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
     );
     pNTC10KChar->setCallbacks(new NTC10KConfigCallback());
 
     // Característica para configuración de conductividad
     BLECharacteristic *pCondChar = pService->createCharacteristic(
-        BLEUUID("2A3C"),  // UUID personalizado para conductividad
+        BLEUUID(BLE_CHAR_CONDUCTIVITY_UUID),
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
     );
     pCondChar->setCallbacks(new ConductivityConfigCallback());
 
     // Característica para configuración de pH
     BLECharacteristic *pPHChar = pService->createCharacteristic(
-        BLEUUID("2A3B"),  // UUID personalizado para pH
+        BLEUUID(BLE_CHAR_PH_UUID),
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
     );
     pPHChar->setCallbacks(new PHConfigCallback());
 
+    // Característica para configuración de sensores
     BLECharacteristic *pSensorsChar = pService->createCharacteristic(
-    BLEUUID("2A40"), // UUID arbitrario para la config de sensores
-    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
+        BLEUUID(BLE_CHAR_SENSORS_UUID),
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
     );
     pSensorsChar->setCallbacks(new SensorsConfigCallback());
+
+    // Característica para configuración LoRa
+    BLECharacteristic *pLoRaConfigChar = pService->createCharacteristic(
+        BLEUUID(BLE_CHAR_LORA_CONFIG_UUID),
+        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
+    );
+    pLoRaConfigChar->setCallbacks(new LoRaConfigCallback());
 
     pService->start();
     return pService;
 }
 
-// ====== setup() ======
-void setup()
-{
-    Serial.begin(115200);
-    pinMode(CONFIG_PIN, INPUT);
-    
-    // Verificar si es primera ejecución y sembrar valores por defecto
-    if (!ConfigManager::checkInitialized()) {
-        Serial.println("Primera ejecución detectada. Inicializando configuración...");
-        ConfigManager::initializeDefaultConfig();
-    }
-    
-    // Verificar modo configuración antes de cualquier otra inicialización
-    checkConfigMode();
-
-    // Borrar todas las preferencias almacenadas
-    // preferences.clear();
-    // nvs_flash_erase();
-    // nvs_flash_init();
-    // Inicializar I2C y PCA9555
+/**
+ * @brief Inicializa configuraciones básicas de hardware:
+ *        - Inicia el bus I2C.
+ *        - Inicializa el expansor de I/O (PCA9555).
+ *        - Configura el PowerManager.
+ */
+void initHardware() {
+    // Inicializar I2C con pines definidos
     Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
 
     // Inicializar PCA9555
@@ -220,29 +235,64 @@ void setup()
     if (!powerManager.begin()) {
         Serial.println("Error al inicializar PowerManager");
     }
+}
+
+/*-------------------------------------------------------------------------------------------------
+   Función setup()
+   Inicializa la comunicación serial, hardware, configuración de sensores y radio,
+   y recupera configuraciones previas del sistema.
+-------------------------------------------------------------------------------------------------*/
+void setup() {
+    Serial.begin(115200);
+    pinMode(CONFIG_PIN, INPUT);
+
+    // Inicializar configuración por defecto en la primera ejecución
+    if (!ConfigManager::checkInitialized()) {
+        Serial.println("Primera ejecución detectada. Inicializando configuración...");
+        ConfigManager::initializeDefaultConfig();
+    }
+    
+    // Verificar si se ha activado el modo configuración antes de continuar
+    checkConfigMode();
+    
+    // Inicialización del NVS y de hardware I2C/IO
+    // preferences.clear();
+    // nvs_flash_erase();
+    // nvs_flash_init();
+
+    // Inicializar hardware (I2C, PCA9555, PowerManager)
+    initHardware();
 
     // Inicializar RTC
     if (!rtcManager.begin()) {
         Serial.println("No se pudo encontrar el RTC");
     }
 
-    // Encender alimentación 3.3V, 2.5V Y -2.5V
+    // Encender la alimentación requerida
     powerManager.power3V3On();
     powerManager.power2V5On();
-    
-    // Aquí llamamos a la inicialización de todos los sensores
-    SensorManager::beginSensors();
 
+    // Inicializar sensores
+    SensorManager::beginSensors();
+    
+    // Inicializar radio LoRa
     int16_t state = radio.begin();
     debug(state != RADIOLIB_ERR_NONE, F("Initialise radio failed"), state, true);
-    // Inicializar preferencias y recuperar el último frame counter
-    preferences.begin("lorawan", false);
-    frameCounter = preferences.getUInt("fcnt", 0);
-    timeToSleep = preferences.getUInt("sleep_time", DEFAULT_TIME_TO_SLEEP);
-    preferences.end(); // Cerrar preferences después de leer
 
-    node.beginABP(devAddr, fNwkSIntKey, sNwkSIntKey, nwkSEncKey, appSKey);
-    node.activateABP(); 
+    // Recuperar frame counter y tiempo de sleep desde configuración almacenada
+    frameCounter = ConfigManager::getFrameCounter();
+    timeToSleep  = ConfigManager::getSleepTime();
+
+    // Configurar parámetros de LoRa en modo ABP
+    LoRaConfig loraConfig = ConfigManager::getLoRaConfig();
+    uint8_t fNwkSIntKey[16], sNwkSIntKey[16], nwkSEncKey[16], appSKey[16];
+    parseKeyString(loraConfig.fNwkSIntKey, fNwkSIntKey, 16);
+    parseKeyString(loraConfig.sNwkSIntKey, sNwkSIntKey, 16);
+    parseKeyString(loraConfig.nwkSEncKey,  nwkSEncKey,  16);
+    parseKeyString(loraConfig.appSKey,     appSKey,     16);
+
+    node.beginABP(loraConfig.devAddr, fNwkSIntKey, sNwkSIntKey, nwkSEncKey, appSKey);
+    node.activateABP();
     debug(state != RADIOLIB_ERR_NONE, F("Activate ABP failed"), state, true);
 
     // // Setup the OTAA session information
@@ -252,64 +302,66 @@ void setup()
     // debug(state != RADIOLIB_LORAWAN_NEW_SESSION, F("Join failed"), state, true);
 
     Serial.println(F("Ready!\n"));
-        Serial.println(F("sleep_time: "));
-    Serial.println(timeToSleep);
 
-    // Después de inicializar el expansor I/O, configurar el pin del LED como salida
+    // Configurar pin para LED de configuración en el expansor
     ioExpander.pinMode(CONFIG_LED_PIN, OUTPUT);
 }
 
+/*-------------------------------------------------------------------------------------------------
+   Función loop()
+   Ejecuta el ciclo principal: comprobación del modo configuración, lecturas de sensores,
+   impresión de resultados de depuración y finalmente entra en deep sleep.
+-------------------------------------------------------------------------------------------------*/
 void loop() {
-    // Verificar modo configuración al inicio de cada ciclo
+    // Comprobar constantemente si se solicita el modo configuración
     checkConfigMode();
     
-    // Crear array para almacenar lecturas
-    SensorReading readings[NUM_SENSORS];
+    // Recuperar la lista de sensores y filtrar los habilitados
+    std::vector<SensorConfig> enabledSensors;
+    auto allSensors = ConfigManager::getAllSensorConfigs();
     
-    // Forzar una lectura del ADC antes de comenzar
-    SensorManager::updateADCReadings();
+    for (const auto& sensor : allSensors) {
+        if (sensor.enable && strlen(sensor.sensorId) > 0) {
+            enabledSensors.push_back(sensor);
+        }
+    }
     
-    // Leer todos los sensores
-    for(size_t i = 0; i < NUM_SENSORS; i++) {
-        readings[i] = SensorManager::getSensorReading(sensorConfigs[i]);
+    // Array para almacenar las lecturas de sensores
+    std::vector<SensorReading> readings;
+    
+    // Forzar lectura inicial del ADC, timeout 1000ms
+    SensorManager::updateADCReadings(1000);
+    
+    // Obtener lecturas de los sensores habilitados
+    for (const auto& sensor : enabledSensors) {
+        readings.push_back(SensorManager::getSensorReading(sensor));
+    }
+    
+    // Construir el payload JSON con la información del device y los sensores:
+    StaticJsonDocument<1024> payload;
+    payload["deviceId"] = ConfigManager::getDeviceId();
+    payload["volt"] = SensorManager::readBatteryVoltage();
+
+    JsonArray sensorsArray = payload.createNestedArray("s");
+    for (const auto &reading : readings) {
+        JsonObject sensorObj = sensorsArray.createNestedObject();
+        sensorObj["id"] = reading.sensorId;
+        sensorObj["tp"] = reading.type;
+        sensorObj["v"] = reading.value;
+        sensorObj["ts"] = reading.timestamp;
     }
 
-    // // Construir payload LoRaWAN
-    // String payload;
-    // for(size_t i = 0; i < NUM_SENSORS; i++) {
-    //     payload += readings[i].sensorId;
-    //     payload += "|";
-    //     payload += readings[i].sensorName;
-    //     payload += "|";
-    //     payload += String(readings[i].type);
-    //     payload += "|";
-    //     payload += String(readings[i].value, 4);
-    //     payload += ";";
-    // }
+
+    String payloadStr; 
+    serializeJson(payload, payloadStr);
+    Serial.println("Payload construido:");
+    Serial.println(payloadStr);
     
-    // // Convertir String a byte array
-    // uint8_t uplinkPayload[payload.length() + 1];
-    // payload.getBytes(uplinkPayload, sizeof(uplinkPayload));
     
-    // Serial.println(F("Enviando datos por LoRaWAN..."));
+    // Actualizar el frame counter en la configuración después de enviar datos
+    ConfigManager::setFrameCounter(frameCounter);
     
-    // // Crear estructura para el evento
-    // LoRaWANEvent_t event;
-    
-    // // Realizar el envío
-    // int state = node.sendReceive(uplinkPayload, sizeof(uplinkPayload), 1, false, &event);    
-    
-    // if (state == RADIOLIB_ERR_NONE || state == RADIOLIB_LORAWAN_NO_DOWNLINK) {
-    //     frameCounter = event.fCnt;
-    //     preferences.putUInt("fcnt", frameCounter);
-    //     Serial.print("Frame Counter: ");
-    //     Serial.println(frameCounter);
-    // }
-    
-    // debug((state != RADIOLIB_LORAWAN_NO_DOWNLINK) && (state != RADIOLIB_ERR_NONE), 
-    //       F("Error in sendReceive"), state, false);
-    
-    // Después de enviar los datos, ir a deep sleep
+    // Entrar en modo deep sleep tras finalizar las tareas del ciclo
     goToDeepSleep();
 }
 

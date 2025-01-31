@@ -22,7 +22,12 @@ class SleepConfigCallback: public BLECharacteristicCallbacks {
 class NTC100KConfigCallback: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) override {
         StaticJsonDocument<200> doc;
-        deserializeJson(doc, pCharacteristic->getValue());
+        DeserializationError error = deserializeJson(doc, pCharacteristic->getValue());
+        if (error) {
+            Serial.print(F("Error deserializando NTC100K config: "));
+            Serial.println(error.c_str());
+            return;
+        }
         
         ConfigManager::setNTC100KConfig(
             doc["t1"] | 0.0,
@@ -56,7 +61,12 @@ class NTC100KConfigCallback: public BLECharacteristicCallbacks {
 class ConductivityConfigCallback: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) override {
         StaticJsonDocument<200> doc;
-        deserializeJson(doc, pCharacteristic->getValue());
+        DeserializationError error = deserializeJson(doc, pCharacteristic->getValue());
+        if (error) {
+            Serial.print(F("Error deserializando Conductivity config: "));
+            Serial.println(error.c_str());
+            return;
+        }
         
         ConfigManager::setConductivityConfig(
             doc["calTemp"] | 0.0f,
@@ -94,7 +104,12 @@ class ConductivityConfigCallback: public BLECharacteristicCallbacks {
 class NTC10KConfigCallback: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) override {
         StaticJsonDocument<200> doc;
-        deserializeJson(doc, pCharacteristic->getValue());
+        DeserializationError error = deserializeJson(doc, pCharacteristic->getValue());
+        if (error) {
+            Serial.print(F("Error deserializando NTC10K config: "));
+            Serial.println(error.c_str());
+            return;
+        }
         
         ConfigManager::setNTC10KConfig(
             doc["t1"] | 0.0,
@@ -128,7 +143,12 @@ class NTC10KConfigCallback: public BLECharacteristicCallbacks {
 class PHConfigCallback: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) override {
         StaticJsonDocument<200> doc;
-        deserializeJson(doc, pCharacteristic->getValue());
+        DeserializationError error = deserializeJson(doc, pCharacteristic->getValue());
+        if (error) {
+            Serial.print(F("Error deserializando pH config: "));
+            Serial.println(error.c_str());
+            return;
+        }
         
         ConfigManager::setPHConfig(
             doc["v1"] | 0.0f,
@@ -162,36 +182,100 @@ class PHConfigCallback: public BLECharacteristicCallbacks {
 
 class SensorsConfigCallback: public BLECharacteristicCallbacks {
     void onWrite(BLECharacteristic *pCharacteristic) override {
-        StaticJsonDocument<512> doc;
-        deserializeJson(doc, pCharacteristic->getValue());
+        DynamicJsonDocument doc(2048);
+        DeserializationError error = deserializeJson(doc, pCharacteristic->getValue());
+        if (error) {
+            Serial.print(F("Error deserializando Sensors config: "));
+            Serial.println(error.c_str());
+            return;
+        }
         
-        const char* sensorId = doc["sensorId"] | "";
-        const char* sensorName = doc["sensorName"] | "";
-        bool enable = doc["enable"] | false;
-        const char* tempSensorId = doc["tempSensorId"] | "";
+        std::vector<SensorConfig> configs;
+        JsonArray sensorArray = doc["sensors"];
         
-        ConfigManager::setSensorConfig(sensorId, sensorName, enable, tempSensorId);
+        for (JsonVariant sensor : sensorArray) {
+            SensorConfig config;
+            strncpy(config.configKey, sensor["k"] | "", sizeof(config.configKey));
+            strncpy(config.sensorId, sensor["id"] | "", sizeof(config.sensorId));
+            strncpy(config.tempSensorId, sensor["ts"] | "", sizeof(config.tempSensorId));
+            config.type = static_cast<SensorType>(sensor["t"] | 0);
+            config.enable = sensor["e"] | false;
+            
+            configs.push_back(config);
+        }
+        
+        ConfigManager::setSensorsConfigs(configs);
     }
     
     void onRead(BLECharacteristic *pCharacteristic) override {
-        DynamicJsonDocument doc(1024);
+        DynamicJsonDocument doc(2048);
         JsonArray sensorArray = doc.createNestedArray("sensors");
         
         std::vector<SensorConfig> configs = ConfigManager::getAllSensorConfigs();
         
         for (const auto& sensor : configs) {
-            JsonObject sensorObj = sensorArray.createNestedObject();
-            sensorObj["sensorId"] = sensor.sensorId;
-            sensorObj["sensorName"] = sensor.sensorName;
-            sensorObj["type"] = (int)sensor.type;
-            sensorObj["adcNumber"] = sensor.adcNumber;
-            sensorObj["channel"] = sensor.channel;
-            sensorObj["tempSensorId"] = sensor.tempSensorId;
-            sensorObj["enable"] = sensor.enable;
+            JsonObject obj = sensorArray.createNestedObject();
+            obj["k"] = sensor.configKey;
+            obj["id"] = sensor.sensorId;
+            obj["t"] = static_cast<int>(sensor.type);
+            obj["ts"] = sensor.tempSensorId;
+            obj["e"] = sensor.enable;
         }
         
         String jsonString;
         serializeJson(doc, jsonString);
         pCharacteristic->setValue(jsonString.c_str());
+    }
+};
+
+class LoRaConfigCallback : public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic* pCharacteristic) override {
+        StaticJsonDocument<256> doc;
+        DeserializationError error = deserializeJson(doc, pCharacteristic->getValue());
+        if (error) {
+            Serial.print(F("Error deserializando LoRa config: "));
+            Serial.println(error.c_str());
+            return;
+        }
+        
+        // Extraer la configuración desde el JSON recibido
+        uint32_t devAddr = doc["devAddr"] | 0;
+        String fNwkSIntKey = doc["fNwkSIntKey"] | "";
+        String sNwkSIntKey = doc["sNwkSIntKey"] | "";
+        String nwkSEncKey  = doc["nwkSEncKey"]  | "";
+        String appSKey     = doc["appSKey"]     | "";
+        
+        // Actualizar la configuración LoRa usando ConfigManager
+        ConfigManager::setLoRaConfig(devAddr, fNwkSIntKey, sNwkSIntKey, nwkSEncKey, appSKey);
+    }
+    
+    void onRead(BLECharacteristic* pCharacteristic) override {
+        // Obtener la configuración LoRa almacenada
+        LoRaConfig config = ConfigManager::getLoRaConfig();
+        
+        StaticJsonDocument<256> doc;
+        doc["devAddr"]       = config.devAddr;
+        doc["fNwkSIntKey"]   = config.fNwkSIntKey;
+        doc["sNwkSIntKey"]   = config.sNwkSIntKey;
+        doc["nwkSEncKey"]    = config.nwkSEncKey;
+        doc["appSKey"]       = config.appSKey;
+        
+        String jsonString;
+        serializeJson(doc, jsonString);
+        pCharacteristic->setValue(jsonString.c_str());
+    }
+};
+
+class DeviceIdConfigCallback : public BLECharacteristicCallbacks {
+    void onWrite(BLECharacteristic *pCharacteristic) override {
+        std::string value = pCharacteristic->getValue();
+        ConfigManager::setDeviceId(String(value.c_str()));
+        Serial.print("Nuevo deviceId configurado: ");
+        Serial.println(value.c_str());
+    }
+    
+    void onRead(BLECharacteristic *pCharacteristic) override {
+        String currentId = ConfigManager::getDeviceId();
+        pCharacteristic->setValue(currentId.c_str());
     }
 };
