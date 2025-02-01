@@ -68,6 +68,7 @@
 
 // ID por defecto del dispositivo
 #define DEFAULT_DEVICE_ID "DEVICE_001"
+#define DEFAULT_STATION_ID "STATION_001"
 
 // ==========================================================
 //                  CALIBRACIONES
@@ -119,7 +120,7 @@
 
 // BLE service y características UUID
 #define BLE_SERVICE_UUID             "180A"
-#define BLE_CHAR_SLEEP_UUID          "2A37"
+#define BLE_CHAR_SYSTEM_UUID         "2A37"
 #define BLE_CHAR_NTC100K_UUID        "2A38"
 #define BLE_CHAR_NTC10K_UUID         "2A39"
 #define BLE_CHAR_CONDUCTIVITY_UUID   "2A3C"
@@ -137,5 +138,84 @@
 #define SPI_RTD_CLOCK     1000000   // 1 MHz
 // Velocidad de SPI para la radio LoRa
 #define SPI_RADIO_CLOCK   100000    // 100 kHz
+
+// ==========================================================
+//          CLAVES PARA CONFIGURACIÓN EN NVS (Preferences)
+// ==========================================================
+
+#define KEY_SLEEP_TIME         "sleep_time"
+#define KEY_STATION_ID         "stationId"
+#define KEY_DEVICE_ID          "deviceId"
+#define KEY_VOLT               "volt"
+
+// Configuración NTC 100K
+#define KEY_NTC100K_T1         "n100k_t1"
+#define KEY_NTC100K_R1         "n100k_r1"
+#define KEY_NTC100K_T2         "n100k_t2"
+#define KEY_NTC100K_R2         "n100k_r2"
+#define KEY_NTC100K_T3         "n100k_t3"
+#define KEY_NTC100K_R3         "n100k_r3"
+
+// Configuración NTC 10K
+#define KEY_NTC10K_T1         "n10k_t1"
+#define KEY_NTC10K_R1         "n10k_r1"
+#define KEY_NTC10K_T2         "n10k_t2"
+#define KEY_NTC10K_R2         "n10k_r2"
+#define KEY_NTC10K_T3         "n10k_t3"
+#define KEY_NTC10K_R3         "n10k_r3"
+
+// Configuración de Conductividad
+#define KEY_CONDUCT_CT         "c_ct"
+#define KEY_CONDUCT_CC         "c_cc"
+#define KEY_CONDUCT_V1         "c_v1"
+#define KEY_CONDUCT_T1         "c_t1"
+#define KEY_CONDUCT_V2         "c_v2"
+#define KEY_CONDUCT_T2         "c_t2"
+#define KEY_CONDUCT_V3         "c_v3"
+#define KEY_CONDUCT_T3         "c_t3"
+
+// Configuración de pH
+#define KEY_PH_V1              "ph_v1"
+#define KEY_PH_T1              "ph_t1"
+#define KEY_PH_V2              "ph_v2"
+#define KEY_PH_T2              "ph_t2"
+#define KEY_PH_V3              "ph_v3"
+#define KEY_PH_T3              "ph_t3"
+#define KEY_PH_CT              "ph_ct"
+
+// --- Claves para la configuración de cada sensor individual ---
+// Estas claves se utilizan dentro del arreglo "sensors"
+#define KEY_SENSOR             "k"
+#define KEY_SENSOR_ID          "id"
+#define KEY_SENSOR_TIMESTAMP   "ts"
+#define KEY_SENSOR_TYPE        "t"
+#define KEY_SENSOR_VALUE       "v"
+#define KEY_SENSOR_ENABLE      "e"
+
+// Configuración LoRa
+#define KEY_LORA_DEVADDR       "devAddr"
+#define KEY_LORA_FNWS_INTKEY   "fNwkSIntKey"
+#define KEY_LORA_SNWS_INTKEY   "sNwkSIntKey"
+#define KEY_LORA_NWKSENC_KEY   "nwkSEncKey"
+#define KEY_LORA_APPS_KEY      "appSKey"
+
+
+// ==========================================================
+//       NAMESPACES PARA CONFIGURACIÓN (NVS/Preferences)
+// ==========================================================
+#define NAMESPACE_SYSTEM    "system"
+#define NAMESPACE_NTC100K "ntc_100k"
+#define NAMESPACE_NTC10K "ntc_10k"
+#define NAMESPACE_COND      "cond"
+#define NAMESPACE_PH        "ph"
+#define NAMESPACE_LORAWAN   "lorawan"
+#define NAMESPACE_SENSORS   "sensors"
+
+// ==========================================================
+//            CLAVES ADICIONALES DE CONFIGURACIÓN
+// ==========================================================
+#define KEY_INITIALIZED     "initialized"
+#define VALUE_INITIALIZED   true
+#define KEY_FCNT            "fcnt"        // Agregado para el frame counter (fcnt)
 
 #endif // CONFIG_H 

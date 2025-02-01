@@ -19,10 +19,6 @@ public:
     static bool checkInitialized();
     static void initializeDefaultConfig();
     
-    // Getters y setters para tiempo de sleep
-    static uint32_t getSleepTime();
-    static void setSleepTime(uint32_t time);
-    
     // Getters y setters para el frame counter (fcnt)
     static uint32_t getFrameCounter();
     static void setFrameCounter(uint32_t fcnt);
@@ -55,20 +51,12 @@ public:
                               const String &sNwkSIntKey, 
                               const String &nwkSEncKey, 
                               const String &appSKey);
-    static String getDeviceId();
-    static void setDeviceId(const String &id);
+    
+    // Métodos unificados para la configuración de sistema (system, sleep y device)
+    static void getSystemConfig(bool &initialized, uint32_t &sleepTime, String &deviceId, String &stationId);
+    static void setSystemConfig(bool initialized, uint32_t sleepTime, const String &deviceId, const String &stationId);
 
 
 private:
     static const SensorConfig defaultConfigs[];
-    static const char* INIT_KEY;
-    static const bool INIT_VALUE;
-    static const char* SENSOR_CONFIG_NAMESPACE;
-    static const char* SYSTEM_NAMESPACE;
-    static const char* SLEEP_NAMESPACE;
-    static const char* NTC_NAMESPACE;
-    static const char* COND_NAMESPACE;
-    static const char* PH_NAMESPACE;
-    static const char* LORAWAN_NAMESPACE;
-    static const char* DEVICE_NAMESPACE;
 }; 

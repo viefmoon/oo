@@ -62,8 +62,13 @@ void initHardware();
    Objetos Globales y Variables
 -------------------------------------------------------------------------------------------------*/
 Preferences preferences;       // Almacenamiento de preferencias en NVS
+
 uint32_t frameCounter;         // Contador de tramas enviadas
+
 uint32_t timeToSleep;          // Tiempo en segundos para deep sleep
+String deviceId;
+String stationId;
+bool systemInitialized;        // Variable global para la inicialización del sistema
 
 RTCManager rtcManager;
 PCA9555 ioExpander(I2C_ADDRESS_PCA9555, I2C_SDA_PIN, I2C_SCL_PIN);
@@ -164,11 +169,12 @@ BLEService* setupBLEService(BLEServer* pServer) {
     BLEService *pService = pServer->createService(BLEUUID(BLE_SERVICE_UUID));
 
     // Característica para tiempo de sleep
-    BLECharacteristic *pSleepChar = pService->createCharacteristic(
-        BLEUUID(BLE_CHAR_SLEEP_UUID),
+    BLECharacteristic *pSystemChar = pService->createCharacteristic(
+        BLEUUID(BLE_CHAR_SYSTEM_UUID),
         BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
     );
-    pSleepChar->setCallbacks(new SleepConfigCallback());
+    pSystemChar->setCallbacks(new SystemConfigCallback());
+
 
     // Característica para configuración NTC 100K
     BLECharacteristic *pNTC100KChar = pService->createCharacteristic(
@@ -252,6 +258,9 @@ void setup() {
         ConfigManager::initializeDefaultConfig();
     }
     
+    // Obtener la configuración del sistema, incluyendo sleepTime, deviceId y stationId
+    ConfigManager::getSystemConfig(systemInitialized, timeToSleep, deviceId, stationId);
+    
     // Verificar si se ha activado el modo configuración antes de continuar
     checkConfigMode();
     
@@ -279,9 +288,8 @@ void setup() {
     int16_t state = radio.begin();
     debug(state != RADIOLIB_ERR_NONE, F("Initialise radio failed"), state, true);
 
-    // Recuperar frame counter y tiempo de sleep desde configuración almacenada
+    // Recuperar frame counter desde configuración almacenada
     frameCounter = ConfigManager::getFrameCounter();
-    timeToSleep  = ConfigManager::getSleepTime();
 
     // Configurar parámetros de LoRa en modo ABP
     LoRaConfig loraConfig = ConfigManager::getLoRaConfig();
@@ -337,26 +345,28 @@ void loop() {
         readings.push_back(SensorManager::getSensorReading(sensor));
     }
     
-    // Construir el payload JSON con la información del device y los sensores:
+    // Construir el payload JSON: stationId a nivel superior y datos directamente en el nivel principal
     StaticJsonDocument<1024> payload;
-    payload["deviceId"] = ConfigManager::getDeviceId();
-    payload["volt"] = SensorManager::readBatteryVoltage();
+    payload[KEY_STATION_ID] = stationId;  // Station a nivel superior
+    payload[KEY_DEVICE_ID] = deviceId;      // Identificador del dispositivo directamente en el root
+    payload[KEY_VOLT] = SensorManager::readBatteryVoltage();
 
-    JsonArray sensorsArray = payload.createNestedArray("s");
+
+    JsonArray sensorsArray = payload.createNestedArray(NAMESPACE_SENSORS);
     for (const auto &reading : readings) {
         JsonObject sensorObj = sensorsArray.createNestedObject();
-        sensorObj["id"] = reading.sensorId;
-        sensorObj["tp"] = reading.type;
-        sensorObj["v"] = reading.value;
-        sensorObj["ts"] = reading.timestamp;
-    }
+        sensorObj[KEY_SENSOR_ID] = reading.sensorId;
+        sensorObj[KEY_SENSOR_TYPE] = reading.type;
+        sensorObj[KEY_SENSOR_VALUE] = reading.value;
+        sensorObj[KEY_SENSOR_TIMESTAMP] = reading.timestamp;
 
+
+    }
 
     String payloadStr; 
     serializeJson(payload, payloadStr);
     Serial.println("Payload construido:");
     Serial.println(payloadStr);
-    
     
     // Actualizar el frame counter en la configuración después de enviar datos
     ConfigManager::setFrameCounter(frameCounter);
