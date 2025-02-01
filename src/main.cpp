@@ -32,6 +32,7 @@
 #include "config_manager.h"
 #include "ble_config_callbacks.h"
 #include "utilities.h"
+#include "ble_service.h"  // Incluir nuestro nuevo header de BLE
 
 /*-------------------------------------------------------------------------------------------------
    Declaración de funciones
@@ -117,35 +118,33 @@ void goToDeepSleep() {
 
 /**
  * @brief Comprueba si se ha activado el modo configuración mediante un pin.
- *        Si el botón de configuración se mantiene presionado el tiempo definido, activa BLE.
+ *        Si se mantiene presionado el botón de configuración durante el tiempo definido, activa BLE.
  */
 void checkConfigMode() {
     if (digitalRead(CONFIG_PIN) == LOW) {
         unsigned long startTime = millis();
-        
         while (digitalRead(CONFIG_PIN) == LOW) {
             if (millis() - startTime >= CONFIG_TRIGGER_TIME) {
                 Serial.println("Modo configuración activado");
-                
-                // Inicializar BLE y crear servicio de configuración
-                // Se cambia el nombre del dispositivo BLE a "SENSOR_DEV" concatenado con loraConfig.devAddr
+
+                // Inicializar BLE y crear servicio de configuración usando la nueva función modularizada
                 LoRaConfig loraConfig = ConfigManager::getLoRaConfig();
                 String bleName = "SENSOR_DEV" + String(loraConfig.devAddr);
                 BLEDevice::init(bleName.c_str());
-                
-                BLEServer *pServer = BLEDevice::createServer();
-                BLEService *pService = setupBLEService(pServer);
-                
+
+                BLEServer* pServer = BLEDevice::createServer();
+                BLEService* pService = setupBLEService(pServer);  // Se usa la nueva función
+
                 // Configurar publicidad BLE
-                BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+                BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
                 pAdvertising->addServiceUUID(pService->getUUID());
                 pAdvertising->setScanResponse(true);
                 pAdvertising->setMinPreferred(0x06);
                 pAdvertising->setMinPreferred(0x12);
                 pAdvertising->start();
-                
+
                 Serial.println("BLE activado - Usa una app para leer/escribir el tiempo de sleep");
-                
+
                 // Bucle de parpadeo del LED de configuración
                 while (true) {
                     ioExpander.digitalWrite(CONFIG_LED_PIN, HIGH);
@@ -156,70 +155,6 @@ void checkConfigMode() {
             }
         }
     }
-}
-
-/**
- * @brief Crea y configura el servicio BLE con sus respectivas características para configuración.
- * 
- * @param pServer Puntero al servidor BLE.
- * @return BLEService* Puntero al servicio creado.
- */
-BLEService* setupBLEService(BLEServer* pServer) {
-    // Crear servicio de configuración usando el UUID definido en config.h
-    BLEService *pService = pServer->createService(BLEUUID(BLE_SERVICE_UUID));
-
-    // Característica para tiempo de sleep
-    BLECharacteristic *pSystemChar = pService->createCharacteristic(
-        BLEUUID(BLE_CHAR_SYSTEM_UUID),
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
-    );
-    pSystemChar->setCallbacks(new SystemConfigCallback());
-
-
-    // Característica para configuración NTC 100K
-    BLECharacteristic *pNTC100KChar = pService->createCharacteristic(
-        BLEUUID(BLE_CHAR_NTC100K_UUID),
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
-    );
-    pNTC100KChar->setCallbacks(new NTC100KConfigCallback());
-
-    // Característica para configuración NTC 10K
-    BLECharacteristic *pNTC10KChar = pService->createCharacteristic(
-        BLEUUID(BLE_CHAR_NTC10K_UUID),
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
-    );
-    pNTC10KChar->setCallbacks(new NTC10KConfigCallback());
-
-    // Característica para configuración de conductividad
-    BLECharacteristic *pCondChar = pService->createCharacteristic(
-        BLEUUID(BLE_CHAR_CONDUCTIVITY_UUID),
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
-    );
-    pCondChar->setCallbacks(new ConductivityConfigCallback());
-
-    // Característica para configuración de pH
-    BLECharacteristic *pPHChar = pService->createCharacteristic(
-        BLEUUID(BLE_CHAR_PH_UUID),
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
-    );
-    pPHChar->setCallbacks(new PHConfigCallback());
-
-    // Característica para configuración de sensores
-    BLECharacteristic *pSensorsChar = pService->createCharacteristic(
-        BLEUUID(BLE_CHAR_SENSORS_UUID),
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
-    );
-    pSensorsChar->setCallbacks(new SensorsConfigCallback());
-
-    // Característica para configuración LoRa
-    BLECharacteristic *pLoRaConfigChar = pService->createCharacteristic(
-        BLEUUID(BLE_CHAR_LORA_CONFIG_UUID),
-        BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_WRITE
-    );
-    pLoRaConfigChar->setCallbacks(new LoRaConfigCallback());
-
-    pService->start();
-    return pService;
 }
 
 /**
