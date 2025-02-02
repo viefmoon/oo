@@ -1,5 +1,8 @@
 #pragma once
 
+// Definición de tamaño general para StaticJsonDocument
+#define JSON_DOC_SIZE 300
+
 #include <BLECharacteristic.h>
 #include <BLEServer.h>  // Necesario para BLEServerCallbacks
 #include "config_manager.h"
@@ -30,7 +33,7 @@ class SystemConfigCallback: public BLECharacteristicCallbacks {
         Serial.println(pCharacteristic->getValue().c_str());
         
         // Se espera un JSON de la forma: { "system": { "initialized": <bool>, "sleep_time": <valor>, "device_id": "<valor>" } }
-        StaticJsonDocument<200> doc;
+        StaticJsonDocument<JSON_DOC_SIZE> doc;
         DeserializationError error = deserializeJson(doc, pCharacteristic->getValue());
         if (error) {
             Serial.print(F("Error deserializando System config: "));
@@ -60,7 +63,7 @@ class SystemConfigCallback: public BLECharacteristicCallbacks {
         String deviceId;
         String stationId;
         ConfigManager::getSystemConfig(initialized, sleepTime, deviceId, stationId);
-        StaticJsonDocument<200> doc;
+        StaticJsonDocument<JSON_DOC_SIZE> doc;
         JsonObject obj = doc.createNestedObject(NAMESPACE_SYSTEM);
         obj[KEY_INITIALIZED] = initialized;
         obj[KEY_SLEEP_TIME] = sleepTime;
@@ -82,7 +85,7 @@ class NTC100KConfigCallback: public BLECharacteristicCallbacks {
         Serial.println(pCharacteristic->getValue().c_str());
 
         // Se espera un JSON de la forma: { "ntc_100k": { <parámetros> } }
-        StaticJsonDocument<200> fullDoc;
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         DeserializationError error = deserializeJson(fullDoc, pCharacteristic->getValue());
         if (error) {
             Serial.print(F("Error deserializando NTC100K config: "));
@@ -130,7 +133,7 @@ class NTC100KConfigCallback: public BLECharacteristicCallbacks {
         Serial.print(F(", R3="));
         Serial.println(r3);
         
-        StaticJsonDocument<200> fullDoc;
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         // Crear objeto anidado con el namespace "ntc_100k"
         JsonObject doc = fullDoc.createNestedObject(NAMESPACE_NTC100K);
         doc[KEY_NTC100K_T1] = t1;
@@ -155,7 +158,7 @@ class ConductivityConfigCallback: public BLECharacteristicCallbacks {
         Serial.println(pCharacteristic->getValue().c_str());
         
         // Se espera un JSON: { "cond": { <parámetros> } }
-        StaticJsonDocument<200> fullDoc;
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         DeserializationError error = deserializeJson(fullDoc, pCharacteristic->getValue());
         if (error) {
             Serial.print(F("Error deserializando Conductivity config: "));
@@ -214,7 +217,7 @@ class ConductivityConfigCallback: public BLECharacteristicCallbacks {
         Serial.print(F(", T3: "));
         Serial.println(t3);
         
-        StaticJsonDocument<200> fullDoc;
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         JsonObject doc = fullDoc.createNestedObject(NAMESPACE_COND);
         doc[KEY_CONDUCT_CT] = calTemp;
         doc[KEY_CONDUCT_CC] = coefComp;
@@ -240,7 +243,7 @@ class NTC10KConfigCallback: public BLECharacteristicCallbacks {
         Serial.println(pCharacteristic->getValue().c_str());
         
         // Se espera JSON: { "ntc_10k": { <parámetros> } }
-        StaticJsonDocument<200> fullDoc;
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         DeserializationError error = deserializeJson(fullDoc, pCharacteristic->getValue());
         if (error) {
             Serial.print(F("Error deserializando NTC10K config: "));
@@ -288,7 +291,7 @@ class NTC10KConfigCallback: public BLECharacteristicCallbacks {
         Serial.print(F(", R3="));
         Serial.println(r3);
         
-        StaticJsonDocument<200> fullDoc;
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         JsonObject doc = fullDoc.createNestedObject(NAMESPACE_NTC10K);
         doc[KEY_NTC10K_T1] = t1;
         doc[KEY_NTC10K_R1] = r1;
@@ -312,7 +315,7 @@ class PHConfigCallback: public BLECharacteristicCallbacks {
         Serial.println(pCharacteristic->getValue().c_str());
         
         // Se espera JSON: { "ph": { <parámetros> } }
-        StaticJsonDocument<200> fullDoc;
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         DeserializationError error = deserializeJson(fullDoc, pCharacteristic->getValue());
         if (error) {
             Serial.print(F("Error deserializando pH config: "));
@@ -365,7 +368,7 @@ class PHConfigCallback: public BLECharacteristicCallbacks {
         Serial.print(F(", CT="));
         Serial.println(calTemp);
         
-        StaticJsonDocument<200> fullDoc;
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         JsonObject doc = fullDoc.createNestedObject(NAMESPACE_PH);
         doc[KEY_PH_V1] = v1;
         doc[KEY_PH_T1] = t1;
@@ -468,7 +471,7 @@ class LoRaConfigCallback : public BLECharacteristicCallbacks {
         Serial.println(pCharacteristic->getValue().c_str());
         
         // Se espera JSON: { "lorawan": { <parámetros> } }
-        StaticJsonDocument<256> fullDoc;
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         DeserializationError error = deserializeJson(fullDoc, pCharacteristic->getValue());
         if (error) {
             Serial.print(F("Error deserializando LoRa config: "));
@@ -511,7 +514,8 @@ class LoRaConfigCallback : public BLECharacteristicCallbacks {
         Serial.print(F(", appSKey: "));
         Serial.println(config.appSKey);
         
-        StaticJsonDocument<256> fullDoc;
+        // Aumentamos el tamaño del documento para asegurarnos de incluir todas las claves
+        StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
         JsonObject doc = fullDoc.createNestedObject(NAMESPACE_LORAWAN);
         doc[KEY_LORA_DEVADDR]     = config.devAddr;
         doc[KEY_LORA_FNWS_INTKEY] = config.fNwkSIntKey;
