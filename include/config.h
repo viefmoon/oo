@@ -143,9 +143,11 @@
 //          CLAVES PARA CONFIGURACIÓN EN NVS (Preferences)
 // ==========================================================
 
+#define KEY_INITIALIZED        "initialized"
 #define KEY_SLEEP_TIME         "sleep_time"
 #define KEY_STATION_ID         "stationId"
 #define KEY_DEVICE_ID          "deviceId"
+
 #define KEY_VOLT               "volt"
 
 // Configuración NTC 100K
@@ -214,7 +216,6 @@
 // ==========================================================
 //            CLAVES ADICIONALES DE CONFIGURACIÓN
 // ==========================================================
-#define KEY_INITIALIZED     "initialized"
 #define VALUE_INITIALIZED   true
 #define KEY_FCNT            "fcnt"        // Agregado para el frame counter (fcnt)
 

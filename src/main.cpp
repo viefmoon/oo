@@ -133,7 +133,8 @@ void checkConfigMode() {
                 BLEDevice::init(bleName.c_str());
 
                 BLEServer* pServer = BLEDevice::createServer();
-                BLEService* pService = setupBLEService(pServer);  // Se usa la nueva función
+                pServer->setCallbacks(new MyBLEServerCallbacks());  // Añadido el callback del servidor
+                BLEService* pService = setupBLEService(pServer);
 
                 // Configurar publicidad BLE
                 BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
