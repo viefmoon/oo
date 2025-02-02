@@ -26,8 +26,6 @@ static void readNamespace(const char* ns, StaticJsonDocument<JSON_DOC_SIZE>& doc
     deserializeJson(doc, jsonString);
 }
 
-// Se eliminan las constantes miembro que referenciaban a los defines.
-// Ahora se hará uso directo de los macros definidos en config.h
 
 const SensorConfig ConfigManager::defaultConfigs[] = {
     {"0", "", NTC_100K_TEMPERATURE_SENSOR, 1, 0, "", false},
