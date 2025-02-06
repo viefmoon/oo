@@ -112,7 +112,7 @@
 // ==========================================================
 //           CONFIGURACIÓN DE LoRa 
 // ==========================================================
-#define DEFAULT_LORA_DEVADDR     0x00bfe104
+#define DEFAULT_LORA_DEVADDR     0x00bfe10
 #define DEFAULT_FNWKS_INTKEY     "63,67,7A,0E,C1,28,7B,82,92,C5,0B,A1,3D,D6,D2,25"
 #define DEFAULT_SNWKS_INTKEY     "DD,14,59,AB,63,6E,50,0D,8A,75,77,A8,75,28,C9,01"
 #define DEFAULT_NWK_SENCKEY      "64,13,E3,99,91,F0,87,56,99,C9,BD,8C,72,07,8F,9E"
