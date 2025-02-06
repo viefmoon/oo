@@ -76,8 +76,6 @@ const uint8_t subBand = 2;  // For US915, change this to 2, otherwise leave on 0
 
 Preferences preferences;       // Almacenamiento de preferencias en NVS
 
-uint32_t frameCounter;         // Contador de tramas enviadas
-
 uint32_t timeToSleep;          // Tiempo en segundos para deep sleep
 String deviceId;
 String stationId;
@@ -231,8 +229,6 @@ void setup() {
     
     // Inicializar radio LoRa y configurar datarate máximo para mayor capacidad de payload
     int16_t state = radio.begin();
-    // Recuperar frame counter desde configuración almacenada
-    frameCounter = ConfigManager::getFrameCounter();
 
     // Configurar parámetros de LoRa en modo ABP
     LoRaConfig loraConfig = ConfigManager::getLoRaConfig();
@@ -289,9 +285,6 @@ void loop() {
     
     // Enviar el payload fragmentado
     sendFragmentedPayload(readings);
-    
-    // Actualizar el frame counter en la configuración después de enviar datos
-    ConfigManager::setFrameCounter(frameCounter);
     
     // Entrar en modo deep sleep tras finalizar las tareas del ciclo
     goToDeepSleep();

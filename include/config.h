@@ -202,11 +202,14 @@
 #define KEY_LORA_NWKSENC_KEY   "nwkSEncKey"
 #define KEY_LORA_APPS_KEY      "appSKey"
 
+#define KEY_LORAWAN_SESSION    "lorawan_session"
+
 
 // ==========================================================
 //       NAMESPACES PARA CONFIGURACIÓN (NVS/Preferences)
 // ==========================================================
 #define NAMESPACE_SYSTEM    "system"
+
 #define NAMESPACE_NTC100K "ntc_100k"
 #define NAMESPACE_NTC10K "ntc_10k"
 #define NAMESPACE_COND      "cond"

@@ -142,19 +142,6 @@ void ConfigManager::setSystemConfig(bool initialized, uint32_t sleepTime, const 
     writeNamespace(NAMESPACE_SYSTEM, doc);
 }
 
-uint32_t ConfigManager::getFrameCounter() {
-    StaticJsonDocument<JSON_DOC_SIZE> doc;
-    readNamespace(NAMESPACE_LORAWAN, doc);
-    return doc[KEY_FCNT] | 0;
-}
-
-void ConfigManager::setFrameCounter(uint32_t fcnt) {
-    StaticJsonDocument<JSON_DOC_SIZE> doc;
-    readNamespace(NAMESPACE_LORAWAN, doc);
-    doc[KEY_FCNT] = fcnt;
-    writeNamespace(NAMESPACE_LORAWAN, doc);
-}
-
 void ConfigManager::getNTC100KConfig(double& t1, double& r1, double& t2, double& r2, double& t3, double& r3) {
     StaticJsonDocument<JSON_DOC_SIZE> doc;
     readNamespace(NAMESPACE_NTC100K, doc);

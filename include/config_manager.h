@@ -3,6 +3,7 @@
 #include <vector>
 #include <Arduino.h>  // Se incluye para utilizar el tipo String
 #include "sensor_types.h"
+#include <RadioLib.h> // Añadido para RADIOLIB_LORAWAN_SESSION_BUF_SIZE
 
 // Definición de la estructura para la configuración de LoRa
 struct LoRaConfig {
@@ -18,10 +19,6 @@ public:
     // Banderas de inicialización
     static bool checkInitialized();
     static void initializeDefaultConfig();
-    
-    // Getters y setters para el frame counter (fcnt)
-    static uint32_t getFrameCounter();
-    static void setFrameCounter(uint32_t fcnt);
     
     // Getters y setters para calibración NTC
     static void getNTC100KConfig(double& t1, double& r1, double& t2, double& r2, double& t3, double& r3);
