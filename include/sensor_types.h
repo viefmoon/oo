@@ -19,7 +19,6 @@ struct SensorConfig {
     char configKey[20];
     char sensorId[20];
     SensorType type;
-    uint8_t adcNumber;
     uint8_t channel;
     char tempSensorId[20]; 
     bool enable;
@@ -29,7 +28,6 @@ struct SensorReading {
     char sensorId[20];
     SensorType type;
     float value;
-    uint32_t timestamp;
 };
 
 #endif // SENSOR_TYPES_H

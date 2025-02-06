@@ -105,57 +105,54 @@ static float convertNTCGeneric(float voltage, double T1, double R1, double T2, d
 }
 
 float convertNTC100K(float voltage) {
+    
     double T1, R1, T2, R2, T3, R3;
     ConfigManager::getNTC100KConfig(T1, R1, T2, R2, T3, R3);
-    return convertNTCGeneric(voltage, T1, R1, T2, R2, T3, R3);
+    float temperature = convertNTCGeneric(voltage, T1, R1, T2, R2, T3, R3);
+    
+    return temperature;
 }
 
 float convertNTC10K(float voltage) {
-    // Obtener valores de calibración usando ConfigManager
+    
     double T1, R1, T2, R2, T3, R3;
     ConfigManager::getNTC10KConfig(T1, R1, T2, R2, T3, R3);
-    return convertNTCGeneric(voltage, T1, R1, T2, R2, T3, R3);
+    float temperature = convertNTCGeneric(voltage, T1, R1, T2, R2, T3, R3);
+    
+    return temperature;
 }
 
 float convertHDS10(float voltage) {
-    // El voltaje recibido es el diferencial (V_izq - V_der)
-    const float V_diff = voltage; // Ya viene como diferencial
-                                    // se calculo experimentalmente
-
-    // Ecuación cuadrática obtenida de la regresión (H = aV² + bV + c)
-    const float a = -147.445f;  // Coeficiente cuadrático
-    const float b = 13.088f;    // Coeficiente lineal 
-    const float c = 100.302f;   // Término independiente
+    
+    const float V_diff = voltage;
+    const float a = -147.445f;
+    const float b = 13.088f;
+    const float c = 100.302f;
     
     float humidity = a * pow(V_diff, 2) + b * V_diff + c;
-    
-    // Limitar valores a rango físico posible (0-100%)
     humidity = constrain(humidity, 0.0f, 100.0f);
     
     return humidity;
 }
 
 float convertSoilMoisture(float voltage) {
-    // Conversión lineal: 0V = 0%, 1.17V = 100%
-    const float SOIL_MOISTURE_FULL_SCALE_V = 1.17f;  // Voltaje al 100% de humedad
+    
+    const float SOIL_MOISTURE_FULL_SCALE_V = 1.17f;
     const float slope = 100.0f / SOIL_MOISTURE_FULL_SCALE_V;
     float humidity = voltage * slope;
-    
-    // Limitar valores a rango físico posible (0-100%)
     humidity = constrain(humidity, 0.0f, 100.0f);
     
     return humidity;
 }
 
 float convertConductivity(float voltage, float solutionTemp) {
-    // Obtener valores de calibración usando ConfigManager
+    
     float calTemp, coefComp, V1, T1, V2, T2, V3, T3;
     ConfigManager::getConductivityConfig(calTemp, coefComp, V1, T1, V2, T2, V3, T3);
 
     // Si solutionTemp es NAN, usar la temperatura de calibración como valor por defecto
     if (isnan(solutionTemp)) {
         solutionTemp = calTemp;
-        Serial.println("Advertencia: Usando temperatura de calibración por defecto para conductividad");
     }
 
     // Matriz para resolver el sistema de ecuaciones
@@ -175,7 +172,6 @@ float convertConductivity(float voltage, float solutionTemp) {
                     + b * compensatedVoltage 
                     + c;
 
-        // Asegura que no sea negativo
         return fmax(conduc, 0.0);
     }
     else {
@@ -183,23 +179,24 @@ float convertConductivity(float voltage, float solutionTemp) {
     }
 }
 
-
 float convertBattery(float voltage) {
-    const double R1 = 470000.0;  // Resistencia R1 del divisor
-    const double R2 = 1500000.0; // Resistencia R2 del divisor
+    
+    const double R1 = 470000.0;
+    const double R2 = 1500000.0;
     const double conversionFactor = (R1 + R2) / R1;
-    return (float)(voltage * conversionFactor);
+    float batteryVoltage = (float)(voltage * conversionFactor);
+    
+    return batteryVoltage;
 }
 
 float convertPH(float voltage, float solutionTemp) {
-    // Obtener valores de calibración usando ConfigManager
+    
     float V1, T1, V2, T2, V3, T3, TEMP_CAL;
     ConfigManager::getPHConfig(V1, T1, V2, T2, V3, T3, TEMP_CAL);
 
     // Si solutionTemp es NAN, usar la temperatura de calibración como valor por defecto
     if (isnan(solutionTemp)) {
         solutionTemp = TEMP_CAL;
-        Serial.println("Advertencia: Usando temperatura de calibración por defecto para pH");
     }
 
     // Datos de calibración (pH, voltaje)
@@ -254,13 +251,8 @@ bool SensorManager::updateADCReadings(uint32_t timeout_ms) {
             adcReadingValid = true;
             
             // Imprimir valores crudos para debug
-            Serial.println("Lectura ADC completa:");
             for (int i = 0; i < 8; i++) {
-                Serial.print("Canal ");
-                Serial.print(i);
-                Serial.print(": ");
-                Serial.print(lastAdcReading.ch[i].f, 8);
-                Serial.println(" V");
+                lastAdcReading.ch[i].f = 0.0f;
             }
             return true;
         }
@@ -268,7 +260,6 @@ bool SensorManager::updateADCReadings(uint32_t timeout_ms) {
     }
     
     // Si llegamos aquí, hubo timeout
-    Serial.println("Timeout en lectura ADC - usando valores 0V");
     for (int i = 0; i < 8; i++) {
         lastAdcReading.ch[i].f = 0.0f;
     }
@@ -276,13 +267,21 @@ bool SensorManager::updateADCReadings(uint32_t timeout_ms) {
 }
 
 float SensorManager::readAnalogSensor(const SensorConfig &cfg) {
+    // Añadir logs de diagnóstico
     float rawValue = lastAdcReading.ch[cfg.channel].f;
     
+    // Añadir validación de canal
+    if (cfg.channel < 0 || cfg.channel >= 8) {
+        return NAN;
+    }
+
     switch(cfg.type) {
         case NTC_100K_TEMPERATURE_SENSOR:
             return convertNTC100K(rawValue);
+            
         case NTC_10K_TEMPERATURE_SENSOR:
             return convertNTC10K(rawValue);
+            
         case PH_SENSOR: {
             float solutionTemp = NAN;
             if(strlen(cfg.tempSensorId) > 0) {
@@ -315,8 +314,6 @@ float SensorManager::readAnalogSensor(const SensorConfig &cfg) {
         case CONDENSATION_HUMIDITY_SENSOR: 
             return convertHDS10(rawValue);
         default:
-            Serial.print("Tipo de sensor no manejado: ");
-            Serial.println(cfg.type);
             return NAN;
     }
 }
@@ -326,8 +323,6 @@ float SensorManager::readRtdSensor() {
     if (status == 0) {
         return rtd.temperature(); // °C
     } else {
-        Serial.print("RTD fault register: ");
-        Serial.println(status);
         return NAN; 
     }
 }
@@ -336,7 +331,6 @@ float SensorManager::readDallasSensor() {
     dallasTemp.requestTemperatures();
     float temp = dallasTemp.getTempCByIndex(0);
     if (temp == DEVICE_DISCONNECTED_C) {
-        Serial.println("Error: No se pudo leer el DS18B20.");
         return NAN;
     }
     return temp;
@@ -351,10 +345,10 @@ float SensorManager::readSensorValue(const SensorConfig &cfg) {
         case CONDUCTIVITY_SENSOR: 
         case SOIL_HUMIDITY_SENSOR:
         case CONDENSATION_HUMIDITY_SENSOR:
+            return readAnalogSensor(cfg);
         case RTD_TEMPERATURE_SENSOR:
             return readRtdSensor();
         case DS18B20_TEMPERATURE_SENSOR:
-
             return readDallasSensor();
         default:
             return 0.0;
@@ -364,30 +358,10 @@ float SensorManager::readSensorValue(const SensorConfig &cfg) {
 SensorReading SensorManager::getSensorReading(const SensorConfig &cfg) {
     SensorReading reading;
     strncpy(reading.sensorId, cfg.sensorId, sizeof(reading.sensorId) - 1);
-
     reading.type = cfg.type;
-    reading.timestamp = rtcManager.getEpochTime();
 
-    // Para sensores analógicos, se solicita la lectura del ADC si todavía no se tengo datos válidos
-    if ((cfg.type == NTC_100K_TEMPERATURE_SENSOR || 
-         cfg.type == NTC_10K_TEMPERATURE_SENSOR || 
-         cfg.type == WATER_NTC_10K_TEMPERATURE_SENSOR ||
-         cfg.type == PH_SENSOR || 
-         cfg.type == CONDUCTIVITY_SENSOR || 
-         cfg.type == SOIL_HUMIDITY_SENSOR || 
-         cfg.type == CONDENSATION_HUMIDITY_SENSOR) && !adcReadingValid) {
-        updateADCReadings(1000);
-    }
-
+    // Realizar la lectura del sensor
     reading.value = readSensorValue(cfg);
-
-    // Debug: Imprimir información de la lectura
-    Serial.print("Lectura sensor - ID: ");
-    Serial.print(reading.sensorId);
-    Serial.print(" | Valor: ");
-    Serial.print(reading.value, 2);
-    Serial.print(" | Timestamp: ");
-    Serial.println(reading.timestamp);
 
     return reading;
 }

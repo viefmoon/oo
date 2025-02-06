@@ -408,7 +408,7 @@ class SensorsConfigCallback: public BLECharacteristicCallbacks {
             SensorConfig config;
             strncpy(config.configKey, sensor[KEY_SENSOR] | "", sizeof(config.configKey));
             strncpy(config.sensorId, sensor[KEY_SENSOR_ID] | "", sizeof(config.sensorId));
-            strncpy(config.tempSensorId, sensor[KEY_SENSOR_TIMESTAMP] | "", sizeof(config.tempSensorId));
+            strncpy(config.tempSensorId, sensor[KEY_SENSOR_ID_TEMPERATURE_SENSOR] | "", sizeof(config.tempSensorId));
             config.type = static_cast<SensorType>(sensor[KEY_SENSOR_TYPE] | 0);
             config.enable = sensor[KEY_SENSOR_ENABLE] | false;
             
@@ -452,7 +452,7 @@ class SensorsConfigCallback: public BLECharacteristicCallbacks {
             obj[KEY_SENSOR]             = sensor.configKey;
             obj[KEY_SENSOR_ID]          = sensor.sensorId;
             obj[KEY_SENSOR_TYPE]        = static_cast<int>(sensor.type);
-            obj[KEY_SENSOR_TIMESTAMP]   = sensor.tempSensorId;
+            obj[KEY_SENSOR_ID_TEMPERATURE_SENSOR]   = sensor.tempSensorId;
             obj[KEY_SENSOR_ENABLE]      = sensor.enable;
         }
 

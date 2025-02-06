@@ -11,6 +11,8 @@
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <vector>
+#include <ArduinoJson.h>
+#include <cmath>  // Agregar para usar pow() y round()
 
 // Bibliotecas específicas del proyecto
 #include "config.h"
@@ -21,7 +23,6 @@
 #include "sensor_types.h"
 #include "SensirionI2cSht4x.h"
 #include "SensorManager.h"
-#include "LoraConfig.h"
 #include "ADS131M08.h"
 #include "LoRaWAN_ESP32.h"
 #include "nvs_flash.h"
@@ -59,9 +60,20 @@ void checkConfigMode();
  */
 void initHardware();
 
+/**
+ * @brief Envía el payload de sensores fragmentado para no superar el tamaño máximo permitido.
+ *        Se limita la precisión a 6 decimales en cada medición y se incluye la cabecera en cada fragmento.
+ * @param readings Vector con todas las lecturas de sensores.
+ */
+void sendFragmentedPayload(const std::vector<SensorReading>& readings);
+
 /*-------------------------------------------------------------------------------------------------
    Objetos Globales y Variables
 -------------------------------------------------------------------------------------------------*/
+
+const LoRaWANBand_t Region = US915;
+const uint8_t subBand = 2;  // For US915, change this to 2, otherwise leave on 0
+
 Preferences preferences;       // Almacenamiento de preferencias en NVS
 
 uint32_t frameCounter;         // Contador de tramas enviadas
@@ -125,7 +137,6 @@ void checkConfigMode() {
         unsigned long startTime = millis();
         while (digitalRead(CONFIG_PIN) == LOW) {
             if (millis() - startTime >= CONFIG_TRIGGER_TIME) {
-                Serial.println("Modo configuración activado");
 
                 // Inicializar BLE y crear servicio de configuración usando la nueva función modularizada
                 LoRaConfig loraConfig = ConfigManager::getLoRaConfig();
@@ -143,8 +154,6 @@ void checkConfigMode() {
                 pAdvertising->setMinPreferred(0x06);
                 pAdvertising->setMinPreferred(0x12);
                 pAdvertising->start();
-
-                Serial.println("BLE activado - Usa una app para leer/escribir el tiempo de sleep");
 
                 // Bucle de parpadeo del LED de configuración
                 while (true) {
@@ -200,7 +209,7 @@ void setup() {
     // Verificar si se ha activado el modo configuración antes de continuar
     checkConfigMode();
     
-    // Inicialización del NVS y de hardware I2C/IO
+    // // Inicialización del NVS y de hardware I2C/IO
     // preferences.clear();
     // nvs_flash_erase();
     // nvs_flash_init();
@@ -220,10 +229,8 @@ void setup() {
     // Inicializar sensores
     SensorManager::beginSensors();
     
-    // Inicializar radio LoRa
+    // Inicializar radio LoRa y configurar datarate máximo para mayor capacidad de payload
     int16_t state = radio.begin();
-    debug(state != RADIOLIB_ERR_NONE, F("Initialise radio failed"), state, true);
-
     // Recuperar frame counter desde configuración almacenada
     frameCounter = ConfigManager::getFrameCounter();
 
@@ -237,15 +244,7 @@ void setup() {
 
     node.beginABP(loraConfig.devAddr, fNwkSIntKey, sNwkSIntKey, nwkSEncKey, appSKey);
     node.activateABP();
-    debug(state != RADIOLIB_ERR_NONE, F("Activate ABP failed"), state, true);
-
-    // // Setup the OTAA session information
-    // node.beginOTAA(joinEUI, devEUI, nwkKey, appKey);
-    // Serial.println(F("Join ('login') the LoRaWAN Network"));
-    // state = node.activateOTAA();
-    // debug(state != RADIOLIB_LORAWAN_NEW_SESSION, F("Join failed"), state, true);
-
-    Serial.println(F("Ready!\n"));
+    node.setDatarate(4);  // DR4: SF8/BW500 ofrece buen balance entre alcance y tamaño de payload
 
     // Configurar pin para LED de configuración en el expansor
     ioExpander.pinMode(CONFIG_LED_PIN, OUTPUT);
@@ -260,10 +259,17 @@ void loop() {
     // Comprobar constantemente si se solicita el modo configuración
     checkConfigMode();
     
-    // Recuperar la lista de sensores y filtrar los habilitados
-    std::vector<SensorConfig> enabledSensors;
+    // Obtener toda la configuración de sensores
     auto allSensors = ConfigManager::getAllSensorConfigs();
     
+    // Añadir log para mostrar todos los sensores y su estado (habilitado/deshabilitado)
+    Serial.println("GET ALL SENSOR: Se han obtenido las siguientes configuraciones de sensores:");
+    for (size_t i = 0; i < allSensors.size(); i++) {
+        Serial.printf("Sensor %zu - ID: %s - %s\n", i, allSensors[i].sensorId, allSensors[i].enable ? "HABILITADO" : "DESHABILITADO");
+    }
+    
+    // Filtrar solo los sensores habilitados para su lectura
+    std::vector<SensorConfig> enabledSensors;
     for (const auto& sensor : allSensors) {
         if (sensor.enable && strlen(sensor.sensorId) > 0) {
             enabledSensors.push_back(sensor);
@@ -281,33 +287,93 @@ void loop() {
         readings.push_back(SensorManager::getSensorReading(sensor));
     }
     
-    // Construir el payload JSON: stationId a nivel superior y datos directamente en el nivel principal
-    StaticJsonDocument<1024> payload;
-    payload[KEY_STATION_ID] = stationId;  // Station a nivel superior
-    payload[KEY_DEVICE_ID] = deviceId;      // Identificador del dispositivo directamente en el root
-    payload[KEY_VOLT] = SensorManager::readBatteryVoltage();
-
-
-    JsonArray sensorsArray = payload.createNestedArray(NAMESPACE_SENSORS);
-    for (const auto &reading : readings) {
-        JsonObject sensorObj = sensorsArray.createNestedObject();
-        sensorObj[KEY_SENSOR_ID] = reading.sensorId;
-        sensorObj[KEY_SENSOR_TYPE] = reading.type;
-        sensorObj[KEY_SENSOR_VALUE] = reading.value;
-        sensorObj[KEY_SENSOR_TIMESTAMP] = reading.timestamp;
-
-
-    }
-
-    String payloadStr; 
-    serializeJson(payload, payloadStr);
-    Serial.println("Payload construido:");
-    Serial.println(payloadStr);
+    // Enviar el payload fragmentado
+    sendFragmentedPayload(readings);
     
     // Actualizar el frame counter en la configuración después de enviar datos
     ConfigManager::setFrameCounter(frameCounter);
     
     // Entrar en modo deep sleep tras finalizar las tareas del ciclo
     goToDeepSleep();
+}
+
+/**
+ * @brief Redondea un valor a un número específico de decimales, solo si el valor 
+ *        realmente tiene más decimales que el límite indicado.
+ * @param value Valor a redondear.
+ * @param decimals Número máximo de decimales permitidos.
+ * @return Valor redondeado o el valor original si ya tiene la precisión requerida.
+ */
+double roundValue(double value, int decimals) {
+    double factor = pow(10.0, decimals);
+    double rounded = round(value * factor) / factor;
+    
+    // Si la diferencia es insignificante, se entiende que el valor no tenía más decimales
+    if (fabs(rounded - value) < 1e-9) {  
+        return value;
+    }
+    return rounded;
+}
+
+/**
+ * @brief Envía el payload de sensores fragmentado para no superar el tamaño máximo permitido.
+ *        Se limita la precisión a 6 decimales en cada medición y se incluye la cabecera en cada fragmento.
+ * @param readings Vector con todas las lecturas de sensores.
+ */
+void sendFragmentedPayload(const std::vector<SensorReading>& readings) {
+    // Obtener el tamaño máximo del payload permitido por la configuración LoRaWAN.
+    const int MAX_PAYLOAD = 200; // DR4 max payload is 250 bytes
+    size_t sensorIndex = 0;
+    int fragmentNumber = 0;
+    
+    while (sensorIndex < readings.size()) {
+        // Crear un nuevo payload con cabecera
+        StaticJsonDocument<512> payload;
+        payload["st"] = stationId;
+        payload["d"] = deviceId;
+        payload["vt"] = roundValue(SensorManager::readBatteryVoltage(), 6);
+        payload["ts"] = rtcManager.getEpochTime();
+        JsonArray sensorArray = payload.createNestedArray("s");
+        
+        String fragmentStr;
+        // Agregar lecturas de sensores mientras no se exceda el tamaño máximo del payload
+        while (sensorIndex < readings.size()) {
+            // Limitar la precisión a 6 decimales usando la función roundValue
+            double valorRedondeado = roundValue(readings[sensorIndex].value, 6);
+            
+            // Agregar la lectura al arreglo del payload
+            JsonObject sensorObj = sensorArray.createNestedObject();
+            sensorObj["id"] = readings[sensorIndex].sensorId;
+            sensorObj["t"] = readings[sensorIndex].type;
+            sensorObj["v"] = valorRedondeado;
+            
+            // Serializar para verificar el tamaño
+            fragmentStr = "";
+            serializeJson(payload, fragmentStr);
+            
+            // Si se excede el límite, eliminar la última lectura y salir del ciclo
+            if (fragmentStr.length() > MAX_PAYLOAD) {
+                sensorArray.remove(sensorArray.size() - 1);
+                break;
+            }
+            
+            sensorIndex++;
+        }
+        
+        // Volver a serializar el payload final para este fragmento
+        fragmentStr = "";
+        serializeJson(payload, fragmentStr);
+        Serial.printf("Enviando fragmento %d con tamaño %d bytes\n", fragmentNumber, fragmentStr.length());
+        Serial.println(fragmentStr);
+        
+        int16_t state = node.sendReceive((uint8_t*)fragmentStr.c_str(), fragmentStr.length());
+        if (state == RADIOLIB_ERR_NONE) {
+            Serial.printf("Fragmento %d enviado correctamente\n", fragmentNumber);
+        } else {
+            Serial.printf("Error enviando fragmento %d: %d\n", fragmentNumber, state);
+        }
+        
+        fragmentNumber++;
+    }
 }
 
