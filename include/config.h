@@ -121,10 +121,9 @@
 
 //FOR OTAA
 #define DEFAULT_JOIN_EUI         "00,00,00,00,00,00,00,00"
-#define DEFAULT_DEV_EUI          "C1,93,6E,58,92,F3,9C,1F"
-#define DEFAULT_NWK_KEY          "0f,a6,00,e5,eb,ae,1a,e1,5f,bd,62,18,a9,68,92,68"
-#define DEFAULT_APP_KEY          "e3,92,2d,74,2b,d7,db,3c,3c,19,d3,2f,48,0a,58,9c"
-
+#define DEFAULT_DEV_EUI          "1a,24,39,80,d2,81,c1,c8"
+#define DEFAULT_APP_KEY          "f1,7c,ce,b8,d5,a3,83,df,fa,09,67,01,36,a9,04,90"
+#define DEFAULT_NWK_KEY          "48,7c,01,0f,34,c1,d4,4c,db,5c,41,87,a9,3f,f0,75"
 // BLE service y características UUID
 #define BLE_SERVICE_UUID             "180A"
 #define BLE_CHAR_SYSTEM_UUID         "2A37"
@@ -223,13 +222,13 @@
 //       NAMESPACES PARA CONFIGURACIÓN (NVS/Preferences)
 // ==========================================================
 #define NAMESPACE_SYSTEM    "system"
-
-#define NAMESPACE_NTC100K "ntc_100k"
-#define NAMESPACE_NTC10K "ntc_10k"
+#define NAMESPACE_NTC100K   "ntc_100k"
+#define NAMESPACE_NTC10K    "ntc_10k"
 #define NAMESPACE_COND      "cond"
 #define NAMESPACE_PH        "ph"
 #define NAMESPACE_LORAWAN   "lorawan"
 #define NAMESPACE_SENSORS   "sensors"
+#define NAMESPACE_LORA_SESSION "lorasession"  // Nuevo namespace para sesión LoRa
 
 // ==========================================================
 //            CLAVES ADICIONALES DE CONFIGURACIÓN

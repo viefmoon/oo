@@ -33,7 +33,7 @@
 #include "config_manager.h"
 #include "ble_config_callbacks.h"
 #include "utilities.h"
-#include "ble_service.h"  // Incluir nuestro nuevo header de BLE
+#include "ble_service.h"  
 
 /*-------------------------------------------------------------------------------------------------
    Declaración de funciones
@@ -67,6 +67,12 @@ void initHardware();
  */
 void sendFragmentedPayload(const std::vector<SensorReading>& readings);
 
+/**
+ * @brief Activa el nodo LoRaWAN restaurando la sesión o realizando un nuevo join
+ * @return Estado de la activación
+ */
+int16_t lwActivate();
+
 /*-------------------------------------------------------------------------------------------------
    Objetos Globales y Variables
 -------------------------------------------------------------------------------------------------*/
@@ -99,6 +105,11 @@ LoRaWANNode node(&radio, &Region, subBand);
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature dallasTemp(&oneWire);
 
+RTC_DATA_ATTR uint16_t bootCount = 0;
+RTC_DATA_ATTR uint16_t bootCountSinceUnsuccessfulJoin = 0;
+RTC_DATA_ATTR uint8_t LWsession[RADIOLIB_LORAWAN_SESSION_BUF_SIZE];
+Preferences store;
+
 /*-------------------------------------------------------------------------------------------------
    Implementación de Funciones
 -------------------------------------------------------------------------------------------------*/
@@ -108,6 +119,11 @@ DallasTemperature dallasTemp(&oneWire);
  */
 void goToDeepSleep() {
     Serial.println("Entrando en Deep Sleep...");
+    
+    // Guardar sesión en RTC
+    uint8_t *persist = node.getBufferSession();
+    memcpy(LWsession, persist, RADIOLIB_LORAWAN_SESSION_BUF_SIZE);
+    
     Serial.flush();
     
     // Configurar el temporizador y GPIO para despertar
@@ -195,55 +211,78 @@ void setup() {
     Serial.begin(115200);
     pinMode(CONFIG_PIN, INPUT);
 
-    // Inicializar configuración por defecto en la primera ejecución
-    if (!ConfigManager::checkInitialized()) {
-        Serial.println("Primera ejecución detectada. Inicializando configuración...");
-        ConfigManager::initializeDefaultConfig();
-    }
-    
-    // Obtener la configuración del sistema, incluyendo sleepTime, deviceId y stationId
-    ConfigManager::getSystemConfig(systemInitialized, timeToSleep, deviceId, stationId);
-    
-    // Verificar si se ha activado el modo configuración antes de continuar
-    checkConfigMode();
-    
     // // Inicialización del NVS y de hardware I2C/IO
     // preferences.clear();
     // nvs_flash_erase();
     // nvs_flash_init();
 
-    // Inicializar hardware (I2C, PCA9555, PowerManager)
+    if (!ConfigManager::checkInitialized()) {
+        Serial.println("Primera ejecución detectada. Inicializando configuración...");
+        ConfigManager::initializeDefaultConfig();
+    }
+    
+    ConfigManager::getSystemConfig(systemInitialized, timeToSleep, deviceId, stationId);
+
+
+    checkConfigMode();
+    
     initHardware();
 
-    // Inicializar RTC
     if (!rtcManager.begin()) {
         Serial.println("No se pudo encontrar el RTC");
     }
 
-    // Encender la alimentación requerida
     powerManager.power3V3On();
     powerManager.power2V5On();
-
-    // Inicializar sensores
     SensorManager::beginSensors();
     
-    // Inicializar radio LoRa y configurar datarate máximo para mayor capacidad de payload
     int16_t state = radio.begin();
+    if (state != RADIOLIB_ERR_NONE) {
+        Serial.printf("Error iniciando radio: %d\n", state);
+    }
 
-    // Configurar parámetros de LoRa en modo ABP
-    LoRaConfig loraConfig = ConfigManager::getLoRaConfig();
-    uint8_t fNwkSIntKey[16], sNwkSIntKey[16], nwkSEncKey[16], appSKey[16];
-    parseKeyString(loraConfig.fNwkSIntKey, fNwkSIntKey, 16);
-    parseKeyString(loraConfig.sNwkSIntKey, sNwkSIntKey, 16);
-    parseKeyString(loraConfig.nwkSEncKey,  nwkSEncKey,  16);
-    parseKeyString(loraConfig.appSKey,     appSKey,     16);
+    // Activar el nodo usando la nueva función
+    state = lwActivate();
+    if (state != RADIOLIB_LORAWAN_NEW_SESSION && state != RADIOLIB_LORAWAN_SESSION_RESTORED) {
+        Serial.printf("Error en la activación LoRaWAN: %d\n", state);
+        goToDeepSleep();
+        return;
+    }
 
-    node.beginABP(loraConfig.devAddr, fNwkSIntKey, sNwkSIntKey, nwkSEncKey, appSKey);
-    node.activateABP();
-    node.setDatarate(4);  // DR4: SF8/BW500 ofrece buen balance entre alcance y tamaño de payload
+    // Configurar datarate
+    node.setDatarate(3);
 
-    // Configurar pin para LED de configuración en el expansor
+    // Configurar pin para LED
     ioExpander.pinMode(CONFIG_LED_PIN, OUTPUT);
+
+    // Solicitar DeviceTime
+    node.sendMacCommandReq(RADIOLIB_LORAWAN_MAC_DEVICE_TIME);
+
+    // Definir puerto y payload dummy para enviar el uplink
+    uint8_t fPort = 1;
+    uint8_t uplinkPayload[] = "DeviceTime Request";
+    uint8_t downlinkPayload[255];
+    size_t downlinkSize = 0;
+
+    // Enviar mensaje confirmado y esperar respuesta usando sendReceive
+    state = node.sendReceive(uplinkPayload, sizeof(uplinkPayload) - 1, fPort, downlinkPayload, &downlinkSize, true);
+    if (state == RADIOLIB_ERR_NONE && downlinkSize > 0) {
+        Serial.printf("Downlink recibido correctamente (%d bytes)\n", downlinkSize);
+    } else {
+        Serial.printf("Error en la comunicación: %d\n", state);
+    }
+
+    // Después de solicitar el DeviceTime (por ejemplo, con node.sendMacCommandReq(RADIOLIB_LORAWAN_MAC_DEVICE_TIME))
+    // o tras enviar tu uplink, llama a getMacDeviceTimeAns() para obtener la respuesta.
+    uint32_t gpsEpoch;
+    uint8_t fraction;
+
+    int16_t dtState = node.getMacDeviceTimeAns(&gpsEpoch, &fraction, true);
+    if (dtState == RADIOLIB_ERR_NONE) {
+        Serial.printf("DeviceTime recibido: epoch = %lu s, fraction = %u\n", gpsEpoch, fraction);
+    } else {
+        Serial.printf("Error al obtener DeviceTime: %d\n", dtState);
+    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -359,7 +398,7 @@ void sendFragmentedPayload(const std::vector<SensorReading>& readings) {
         Serial.printf("Enviando fragmento %d con tamaño %d bytes\n", fragmentNumber, fragmentStr.length());
         Serial.println(fragmentStr);
         
-        int16_t state = node.sendReceive((uint8_t*)fragmentStr.c_str(), fragmentStr.length());
+        int16_t state = node.sendReceive((uint8_t*)fragmentStr.c_str(), fragmentStr.length(), 1, true);
         if (state == RADIOLIB_ERR_NONE) {
             Serial.printf("Fragmento %d enviado correctamente\n", fragmentNumber);
         } else {
@@ -368,5 +407,91 @@ void sendFragmentedPayload(const std::vector<SensorReading>& readings) {
         
         fragmentNumber++;
     }
+}
+
+/**
+ * @brief Activa el nodo LoRaWAN restaurando la sesión o realizando un nuevo join
+ * @return Estado de la activación
+ */
+int16_t lwActivate() {
+    int16_t state = RADIOLIB_ERR_UNKNOWN;
+
+    // Obtener configuración LoRa
+    LoRaConfig loraConfig = ConfigManager::getLoRaConfig();
+    
+    // Convertir strings de EUIs a uint64_t
+    uint64_t joinEUI = 0, devEUI = 0;
+    if (!parseEUIString(loraConfig.joinEUI.c_str(), &joinEUI) ||
+        !parseEUIString(loraConfig.devEUI.c_str(), &devEUI)) {
+        Serial.println("Error al parsear EUIs");
+        return state;
+    }
+    
+    // Parsear las claves
+    uint8_t nwkKey[16], appKey[16];
+    parseKeyString(loraConfig.nwkKey, nwkKey, 16);
+    parseKeyString(loraConfig.appKey, appKey, 16);
+
+    // Configurar la sesión OTAA
+    node.beginOTAA(joinEUI, devEUI, nwkKey, appKey);
+
+    Serial.println("Recuperando nonces y sesión LoRaWAN");
+    store.begin("radiolib");
+
+    // Intentar restaurar nonces si existen
+    if (store.isKey("nonces")) {
+        uint8_t buffer[RADIOLIB_LORAWAN_NONCES_BUF_SIZE];
+        store.getBytes("nonces", buffer, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+        state = node.setBufferNonces(buffer);
+        
+        if (state == RADIOLIB_ERR_NONE) {
+            // Intentar restaurar sesión desde RTC
+            state = node.setBufferSession(LWsession);
+            
+            if (state == RADIOLIB_ERR_NONE) {
+                Serial.println("Sesión restaurada exitosamente - activando");
+                state = node.activateOTAA();
+                
+                if (state == RADIOLIB_LORAWAN_SESSION_RESTORED) {
+                    store.end();
+                    return state;
+                }
+            }
+        }
+    } else {
+        Serial.println("No hay nonces guardados - iniciando nuevo join");
+    }
+
+    // Si llegamos aquí, necesitamos hacer un nuevo join
+    state = RADIOLIB_ERR_NETWORK_NOT_JOINED;
+    while (state != RADIOLIB_LORAWAN_NEW_SESSION) {
+        Serial.println("Iniciando join a la red LoRaWAN");
+        state = node.activateOTAA();
+
+        // Guardar nonces en flash
+        if (state == RADIOLIB_LORAWAN_NEW_SESSION) {
+            Serial.println("Guardando nonces en flash");
+            uint8_t buffer[RADIOLIB_LORAWAN_NONCES_BUF_SIZE];
+            uint8_t *persist = node.getBufferNonces();
+            memcpy(buffer, persist, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+            store.putBytes("nonces", buffer, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+        } else {
+            Serial.printf("Join falló: %d\n", state);
+            bootCountSinceUnsuccessfulJoin++;
+            
+            uint32_t sleepForSeconds = min((bootCountSinceUnsuccessfulJoin + 1UL) * 60UL, 3UL * 60UL);
+            Serial.printf("Reintentando join en %lu segundos\n", sleepForSeconds);
+            
+            store.end();
+            goToDeepSleep();
+        }
+    }
+
+    Serial.println("Join exitoso");
+    bootCountSinceUnsuccessfulJoin = 0;
+    delay(1000);
+    
+    store.end();
+    return state;
 }
 
