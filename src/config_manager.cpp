@@ -113,13 +113,19 @@ void ConfigManager::initializeDefaultConfig() {
     // LoRa: NAMESPACE_LORAWAN
     {
         StaticJsonDocument<JSON_DOC_SIZE> doc;
+        //FOR ABP
         doc[KEY_LORA_DEVADDR] = DEFAULT_LORA_DEVADDR;
         doc[KEY_LORA_FNWS_INTKEY] = DEFAULT_FNWKS_INTKEY;
         doc[KEY_LORA_SNWS_INTKEY] = DEFAULT_SNWKS_INTKEY;
         doc[KEY_LORA_NWKSENC_KEY]  = DEFAULT_NWK_SENCKEY;
         doc[KEY_LORA_APPS_KEY]     = DEFAULT_APPS_KEY;
-        doc[KEY_FCNT] = 0;
+        //FOR OTAA
+        doc[KEY_LORA_JOIN_EUI]      = DEFAULT_JOIN_EUI;
+        doc[KEY_LORA_DEV_EUI]       = DEFAULT_DEV_EUI;
+        doc[KEY_LORA_NWK_KEY]      = DEFAULT_NWK_KEY;
+        doc[KEY_LORA_APP_KEY]      = DEFAULT_APP_KEY;
         writeNamespace(NAMESPACE_LORAWAN, doc);
+
     }
 }
 
@@ -320,12 +326,20 @@ LoRaConfig ConfigManager::getLoRaConfig() {
     readNamespace(NAMESPACE_LORAWAN, doc);
     
     LoRaConfig config;
+    //FOR ABP
     config.devAddr    = doc[KEY_LORA_DEVADDR] | DEFAULT_LORA_DEVADDR;
     config.fNwkSIntKey = doc[KEY_LORA_FNWS_INTKEY] | DEFAULT_FNWKS_INTKEY;
     config.sNwkSIntKey = doc[KEY_LORA_SNWS_INTKEY] | DEFAULT_SNWKS_INTKEY;
     config.nwkSEncKey  = doc[KEY_LORA_NWKSENC_KEY]  | DEFAULT_NWK_SENCKEY;
     config.appSKey     = doc[KEY_LORA_APPS_KEY]     | DEFAULT_APPS_KEY;
+    //FOR OTAA
+    config.joinEUI     = doc[KEY_LORA_JOIN_EUI]      | DEFAULT_JOIN_EUI;
+    config.devEUI     = doc[KEY_LORA_DEV_EUI]      | DEFAULT_DEV_EUI;
+    config.nwkKey     = doc[KEY_LORA_NWK_KEY]      | DEFAULT_NWK_KEY;
+    config.appKey     = doc[KEY_LORA_APP_KEY]      | DEFAULT_APP_KEY;
     
+
+
     return config;
 }
 
@@ -333,14 +347,25 @@ void ConfigManager::setLoRaConfig(uint32_t devAddr,
     const String &fNwkSIntKey, 
     const String &sNwkSIntKey, 
     const String &nwkSEncKey, 
-    const String &appSKey) {
+    const String &appSKey, 
+    const String &joinEUI, 
+    const String &devEUI, 
+    const String &nwkKey, 
+    const String &appKey) {
+
 
     StaticJsonDocument<JSON_DOC_SIZE> doc;
     readNamespace(NAMESPACE_LORAWAN, doc);
+    //FOR ABP
     doc[KEY_LORA_DEVADDR] = devAddr;
     doc[KEY_LORA_FNWS_INTKEY] = fNwkSIntKey;
     doc[KEY_LORA_SNWS_INTKEY] = sNwkSIntKey;
     doc[KEY_LORA_NWKSENC_KEY]  = nwkSEncKey;
     doc[KEY_LORA_APPS_KEY]     = appSKey;
+    //FOR OTAA
+    doc[KEY_LORA_JOIN_EUI]      = joinEUI;
+    doc[KEY_LORA_DEV_EUI]       = devEUI;
+    doc[KEY_LORA_NWK_KEY]      = nwkKey;
+    doc[KEY_LORA_APP_KEY]      = appKey;
     writeNamespace(NAMESPACE_LORAWAN, doc);
 }

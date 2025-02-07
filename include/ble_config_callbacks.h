@@ -484,6 +484,10 @@ class LoRaConfigCallback : public BLECharacteristicCallbacks {
         String sNwkSIntKey = doc[KEY_LORA_SNWS_INTKEY] | "";
         String nwkSEncKey  = doc[KEY_LORA_NWKSENC_KEY]  | "";
         String appSKey     = doc[KEY_LORA_APPS_KEY]     | "";
+        String joinEUI     = doc[KEY_LORA_JOIN_EUI]      | "";
+        String devEUI     = doc[KEY_LORA_DEV_EUI]      | "";
+        String nwkKey     = doc[KEY_LORA_NWK_KEY]      | "";
+        String appKey     = doc[KEY_LORA_APP_KEY]      | "";
         
         Serial.print(F("DEBUG: LoRa valores parseados - devAddr: "));
         Serial.print(devAddr);
@@ -496,7 +500,7 @@ class LoRaConfigCallback : public BLECharacteristicCallbacks {
         Serial.print(F(", appSKey: "));
         Serial.println(appSKey);
         
-        ConfigManager::setLoRaConfig(devAddr, fNwkSIntKey, sNwkSIntKey, nwkSEncKey, appSKey);
+        ConfigManager::setLoRaConfig(devAddr, fNwkSIntKey, sNwkSIntKey, nwkSEncKey, appSKey, joinEUI, devEUI, nwkKey, appKey);
     }
     
     void onRead(BLECharacteristic* pCharacteristic) override {
@@ -513,6 +517,12 @@ class LoRaConfigCallback : public BLECharacteristicCallbacks {
         Serial.print(config.nwkSEncKey);
         Serial.print(F(", appSKey: "));
         Serial.println(config.appSKey);
+        Serial.print(F(", joinEUI: "));
+        Serial.println(config.joinEUI);
+        Serial.print(F(", devEUI: "));
+        Serial.println(config.devEUI);
+        Serial.print(F(", nwkKey: "));
+        Serial.println(config.nwkKey);
         
         // Aumentamos el tamaño del documento para asegurarnos de incluir todas las claves
         StaticJsonDocument<JSON_DOC_SIZE> fullDoc;
@@ -522,7 +532,10 @@ class LoRaConfigCallback : public BLECharacteristicCallbacks {
         doc[KEY_LORA_SNWS_INTKEY] = config.sNwkSIntKey;
         doc[KEY_LORA_NWKSENC_KEY]  = config.nwkSEncKey;
         doc[KEY_LORA_APPS_KEY]     = config.appSKey;
-        
+        doc[KEY_LORA_JOIN_EUI]     = config.joinEUI;
+        doc[KEY_LORA_DEV_EUI]     = config.devEUI;
+        doc[KEY_LORA_NWK_KEY]     = config.nwkKey;
+        doc[KEY_LORA_APP_KEY]     = config.appKey;
         String jsonString;
         serializeJson(fullDoc, jsonString);
         Serial.print(F("DEBUG: LoRaConfigCallback onRead - JSON enviado: "));

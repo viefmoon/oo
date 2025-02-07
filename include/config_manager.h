@@ -7,11 +7,17 @@
 
 // Definición de la estructura para la configuración de LoRa
 struct LoRaConfig {
+    //FOR ABP
     uint32_t devAddr;
     String fNwkSIntKey;
     String sNwkSIntKey;
     String nwkSEncKey;
     String appSKey;
+    //FOR OTAA
+    String joinEUI;
+    String devEUI;
+    String nwkKey;
+    String appKey;
 };
 
 class ConfigManager {
@@ -47,7 +53,11 @@ public:
                               const String &fNwkSIntKey, 
                               const String &sNwkSIntKey, 
                               const String &nwkSEncKey, 
-                              const String &appSKey);
+                              const String &appSKey, 
+                              const String &joinEUI, 
+                              const String &devEUI, 
+                              const String &nwkKey, 
+                              const String &appKey);
     
     // Métodos unificados para la configuración de sistema (system, sleep y device)
     static void getSystemConfig(bool &initialized, uint32_t &sleepTime, String &deviceId, String &stationId);

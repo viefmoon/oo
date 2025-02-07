@@ -112,11 +112,18 @@
 // ==========================================================
 //           CONFIGURACIÓN DE LoRa 
 // ==========================================================
+//FOR ABP
 #define DEFAULT_LORA_DEVADDR     0x00bfe104
 #define DEFAULT_FNWKS_INTKEY     "63,67,7A,0E,C1,28,7B,82,92,C5,0B,A1,3D,D6,D2,25"
 #define DEFAULT_SNWKS_INTKEY     "DD,14,59,AB,63,6E,50,0D,8A,75,77,A8,75,28,C9,01"
 #define DEFAULT_NWK_SENCKEY      "64,13,E3,99,91,F0,87,56,99,C9,BD,8C,72,07,8F,9E"
 #define DEFAULT_APPS_KEY         "EE,F1,30,98,6A,11,4E,69,D0,DE,8A,DC,D6,8D,28,A6"
+
+//FOR OTAA
+#define DEFAULT_JOIN_EUI         "00,00,00,00,00,00,00,00"
+#define DEFAULT_DEV_EUI          "C1,93,6E,58,92,F3,9C,1F"
+#define DEFAULT_NWK_KEY          "0f,a6,00,e5,eb,ae,1a,e1,5f,bd,62,18,a9,68,92,68"
+#define DEFAULT_APP_KEY          "e3,92,2d,74,2b,d7,db,3c,3c,19,d3,2f,48,0a,58,9c"
 
 // BLE service y características UUID
 #define BLE_SERVICE_UUID             "180A"
@@ -196,11 +203,18 @@
 #define KEY_SENSOR_ENABLE      "e"
 
 // Configuración LoRa
+//FOR ABP
 #define KEY_LORA_DEVADDR       "devAddr"
 #define KEY_LORA_FNWS_INTKEY   "fNwkSIntKey"
 #define KEY_LORA_SNWS_INTKEY   "sNwkSIntKey"
 #define KEY_LORA_NWKSENC_KEY   "nwkSEncKey"
 #define KEY_LORA_APPS_KEY      "appSKey"
+//FOR OTAA
+#define KEY_LORA_JOIN_EUI      "joinEUI"
+#define KEY_LORA_DEV_EUI       "devEUI"
+#define KEY_LORA_NWK_KEY      "nwkKey"
+#define KEY_LORA_APP_KEY      "appKey"
+
 
 #define KEY_LORAWAN_SESSION    "lorawan_session"
 
@@ -221,6 +235,4 @@
 //            CLAVES ADICIONALES DE CONFIGURACIÓN
 // ==========================================================
 #define VALUE_INITIALIZED   true
-#define KEY_FCNT            "fcnt"        // Agregado para el frame counter (fcnt)
-
 #endif // CONFIG_H 
