@@ -154,7 +154,7 @@ void checkConfigMode() {
 
                 // Inicializar BLE y crear servicio de configuración usando la nueva función modularizada
                 LoRaConfig loraConfig = ConfigManager::getLoRaConfig();
-                String bleName = "SENSOR_DEV" + String(loraConfig.devAddr);
+                String bleName = "SENSOR_DEV" + String(loraConfig.devEUI);
                 BLEDevice::init(bleName.c_str());
 
                 BLEServer* pServer = BLEDevice::createServer();
