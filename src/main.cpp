@@ -248,41 +248,11 @@ void setup() {
         goToDeepSleep();
         return;
     }
-
     // Configurar datarate
     node.setDatarate(3);
 
     // Configurar pin para LED
     ioExpander.pinMode(CONFIG_LED_PIN, OUTPUT);
-
-    // Solicitar DeviceTime
-    node.sendMacCommandReq(RADIOLIB_LORAWAN_MAC_DEVICE_TIME);
-
-    // Definir puerto y payload dummy para enviar el uplink
-    uint8_t fPort = 1;
-    uint8_t uplinkPayload[] = "DeviceTime Request";
-    uint8_t downlinkPayload[255];
-    size_t downlinkSize = 0;
-
-    // Enviar mensaje confirmado y esperar respuesta usando sendReceive
-    state = node.sendReceive(uplinkPayload, sizeof(uplinkPayload) - 1, fPort, downlinkPayload, &downlinkSize, true);
-    if (state == RADIOLIB_ERR_NONE && downlinkSize > 0) {
-        Serial.printf("Downlink recibido correctamente (%d bytes)\n", downlinkSize);
-    } else {
-        Serial.printf("Error en la comunicación: %d\n", state);
-    }
-
-    // Después de solicitar el DeviceTime (por ejemplo, con node.sendMacCommandReq(RADIOLIB_LORAWAN_MAC_DEVICE_TIME))
-    // o tras enviar tu uplink, llama a getMacDeviceTimeAns() para obtener la respuesta.
-    uint32_t gpsEpoch;
-    uint8_t fraction;
-
-    int16_t dtState = node.getMacDeviceTimeAns(&gpsEpoch, &fraction, true);
-    if (dtState == RADIOLIB_ERR_NONE) {
-        Serial.printf("DeviceTime recibido: epoch = %lu s, fraction = %u\n", gpsEpoch, fraction);
-    } else {
-        Serial.printf("Error al obtener DeviceTime: %d\n", dtState);
-    }
 }
 
 /*-------------------------------------------------------------------------------------------------
@@ -468,29 +438,59 @@ int16_t lwActivate() {
         Serial.println("Iniciando join a la red LoRaWAN");
         state = node.activateOTAA();
 
-        // Guardar nonces en flash
+        // Guardar nonces en flash si el join fue exitoso
         if (state == RADIOLIB_LORAWAN_NEW_SESSION) {
-            Serial.println("Guardando nonces en flash");
+            Serial.println("Join exitoso - Guardando nonces en flash");
             uint8_t buffer[RADIOLIB_LORAWAN_NONCES_BUF_SIZE];
             uint8_t *persist = node.getBufferNonces();
             memcpy(buffer, persist, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
             store.putBytes("nonces", buffer, RADIOLIB_LORAWAN_NONCES_BUF_SIZE);
+
+            // Solicitar DeviceTime después de un join exitoso
+            delay(1000); // Pequeña pausa para estabilización
+            node.setDatarate(3);
+            
+            // Intentar obtener DeviceTime
+            Serial.println("Solicitando DeviceTime...");
+            bool macCommandSuccess = node.sendMacCommandReq(RADIOLIB_LORAWAN_MAC_DEVICE_TIME);
+            if (macCommandSuccess) {
+                // Enviar mensaje vacío para recibir el DeviceTime
+                uint8_t fPort = 1;
+                uint8_t downlinkPayload[255];
+                size_t downlinkSize = 0;
+                
+                int16_t rxState = node.sendReceive(nullptr, 0, fPort, downlinkPayload, &downlinkSize, true);
+                if (rxState == RADIOLIB_ERR_NONE) {
+                    // Obtener y procesar DeviceTime
+                    uint32_t unixEpoch;
+                    uint8_t fraction;
+                    int16_t dtState = node.getMacDeviceTimeAns(&unixEpoch, &fraction, true);
+                    if (dtState == RADIOLIB_ERR_NONE) {
+                        Serial.printf("DeviceTime recibido: epoch = %lu s, fraction = %u\n", unixEpoch, fraction);
+                        rtcManager.setTimeFromServer(unixEpoch, fraction);
+                    } else {
+                        Serial.printf("Error al obtener DeviceTime: %d\n", dtState);
+                        // Continuar aunque falle el DeviceTime
+                    }
+                } else {
+                    Serial.printf("Error al recibir respuesta: %d\n", rxState);
+                }
+            } else {
+                Serial.println("Error al solicitar DeviceTime: comando no pudo ser encolado");
+            }
+            
+            // Retornar éxito incluso si falla el DeviceTime
+            bootCountSinceUnsuccessfulJoin = 0;
+            store.end();
+            return RADIOLIB_LORAWAN_NEW_SESSION;
         } else {
             Serial.printf("Join falló: %d\n", state);
             bootCountSinceUnsuccessfulJoin++;
-            
-            uint32_t sleepForSeconds = min((bootCountSinceUnsuccessfulJoin + 1UL) * 60UL, 3UL * 60UL);
-            Serial.printf("Reintentando join en %lu segundos\n", sleepForSeconds);
-            
             store.end();
             goToDeepSleep();
         }
     }
 
-    Serial.println("Join exitoso");
-    bootCountSinceUnsuccessfulJoin = 0;
-    delay(1000);
-    
     store.end();
     return state;
 }

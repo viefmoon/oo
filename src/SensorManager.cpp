@@ -250,16 +250,13 @@ bool SensorManager::updateADCReadings(uint32_t timeout_ms) {
             lastAdcReading = adc.readAdcFloat();
             adcReadingValid = true;
             
-            // Imprimir valores crudos para debug
-            for (int i = 0; i < 8; i++) {
-                lastAdcReading.ch[i].f = 0.0f;
-            }
+            // Se han quitado los prints de debug
             return true;
         }
         yield(); // Permitir que se ejecuten otras tareas en vez de busy-wait
     }
     
-    // Si llegamos aquí, hubo timeout
+    // Si hubo timeout, se asignan 0 a todas las lecturas
     for (int i = 0; i < 8; i++) {
         lastAdcReading.ch[i].f = 0.0f;
     }

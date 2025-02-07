@@ -35,3 +35,21 @@ uint32_t RTCManager::getEpochTime() {
     DateTime now = getCurrentTime();
     return now.unixtime();
 }
+
+
+bool RTCManager::setTimeFromServer(uint32_t unixTime, uint8_t fraction) {
+    // Ajustar el RTC con el tiempo Unix directamente
+    DateTime newTime(unixTime);
+    rtc.adjust(newTime);
+    
+    // Verificar que el tiempo se haya establecido correctamente
+    DateTime currentTime = rtc.now();
+    if (abs((long)(currentTime.unixtime() - unixTime)) <= 1) {
+        Serial.println("RTC actualizado exitosamente con tiempo del servidor");
+        printDateTime();
+        return true;
+    }
+    
+    Serial.println("Error al actualizar RTC con tiempo del servidor");
+    return false;
+}
