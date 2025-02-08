@@ -28,15 +28,15 @@ static void readNamespace(const char* ns, StaticJsonDocument<JSON_DOC_SIZE>& doc
 }
 
 const SensorConfig ConfigManager::defaultConfigs[] = {
-    {"0", "NTC1", NTC_100K_TEMPERATURE_SENSOR, 0, "", true},
-    {"1", "NTC2", NTC_100K_TEMPERATURE_SENSOR, 1, "", true},
-    {"2", "CH1", CONDENSATION_HUMIDITY_SENSOR, 2, "", true},
-    {"3", "SM1", SOIL_HUMIDITY_SENSOR, 3, "", true},
-    {"4", "SM2", SOIL_HUMIDITY_SENSOR, 4, "", true},
-    {"5", "CON1", CONDUCTIVITY_SENSOR, 5, "", true},
-    {"7", "PH1", PH_SENSOR, 7, "", true},
-    {"R", "RTD1", RTD_TEMPERATURE_SENSOR, 0, "", true},
-    {"D", "DS1", DS18B20_TEMPERATURE_SENSOR, 0, "", true}
+    {"0", "NTC1", N100K, 0, "", true},
+    {"1", "NTC2", N100K, 1, "", true},
+    {"2", "CH1", CONDH, 2, "", true},
+    {"3", "SM1", SOILH, 3, "", true},
+    {"4", "SM2", SOILH, 4, "", true},
+    {"5", "CON1", COND, 5, "", true},
+    {"7", "PH1", PH, 7, "", true},
+    {"R", "RTD1", RTD, 0, "", true},
+    {"D", "DS1", DS18B20, 0, "", true}
 };
 
 bool ConfigManager::checkInitialized() {

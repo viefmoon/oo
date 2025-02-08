@@ -273,13 +273,13 @@ float SensorManager::readAnalogSensor(const SensorConfig &cfg) {
     }
 
     switch(cfg.type) {
-        case NTC_100K_TEMPERATURE_SENSOR:
+        case N100K:
             return convertNTC100K(rawValue);
             
-        case NTC_10K_TEMPERATURE_SENSOR:
+        case N10K:
             return convertNTC10K(rawValue);
             
-        case PH_SENSOR: {
+        case PH: {
             float solutionTemp = NAN;
             if(strlen(cfg.tempSensorId) > 0) {
                 auto sensors = ConfigManager::getAllSensorConfigs();
@@ -292,7 +292,7 @@ float SensorManager::readAnalogSensor(const SensorConfig &cfg) {
             }
             return convertPH(rawValue, solutionTemp);
         }
-        case CONDUCTIVITY_SENSOR: {
+        case COND: {
             float solutionTemp = NAN;
             if(strlen(cfg.tempSensorId) > 0) {
                 auto sensors = ConfigManager::getAllSensorConfigs();
@@ -305,10 +305,10 @@ float SensorManager::readAnalogSensor(const SensorConfig &cfg) {
             }
             return convertConductivity(rawValue, solutionTemp);
         }
-        case SOIL_HUMIDITY_SENSOR:
+        case SOILH:
             return convertSoilMoisture(rawValue);
 
-        case CONDENSATION_HUMIDITY_SENSOR: 
+        case CONDH: 
             return convertHDS10(rawValue);
         default:
             return NAN;
@@ -335,17 +335,17 @@ float SensorManager::readDallasSensor() {
 
 float SensorManager::readSensorValue(const SensorConfig &cfg) {
     switch(cfg.type) {
-        case NTC_100K_TEMPERATURE_SENSOR:
-        case NTC_10K_TEMPERATURE_SENSOR:
-        case WATER_NTC_10K_TEMPERATURE_SENSOR:
-        case PH_SENSOR:
-        case CONDUCTIVITY_SENSOR: 
-        case SOIL_HUMIDITY_SENSOR:
-        case CONDENSATION_HUMIDITY_SENSOR:
+        case N100K:
+        case N10K:
+        case WNTC10K:
+        case PH:
+        case COND: 
+        case SOILH:
+        case CONDH:
             return readAnalogSensor(cfg);
-        case RTD_TEMPERATURE_SENSOR:
+        case RTD:
             return readRtdSensor();
-        case DS18B20_TEMPERATURE_SENSOR:
+        case DS18B20:
             return readDallasSensor();
         default:
             return 0.0;

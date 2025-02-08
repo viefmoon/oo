@@ -4,15 +4,15 @@
 #include <stdint.h>
 
 enum SensorType {
-    NTC_100K_TEMPERATURE_SENSOR,
-    NTC_10K_TEMPERATURE_SENSOR,
-    WATER_NTC_10K_TEMPERATURE_SENSOR,
-    RTD_TEMPERATURE_SENSOR,
-    DS18B20_TEMPERATURE_SENSOR, 
-    PH_SENSOR,
-    CONDUCTIVITY_SENSOR,
-    CONDENSATION_HUMIDITY_SENSOR,
-    SOIL_HUMIDITY_SENSOR,
+    N100K, // NTC 100K
+    N10K, // NTC 10K
+    WNTC10K, // Water NTC 10K
+    RTD, // RTD
+    DS18B20, // DS18B20
+    PH, // PH
+    COND, // Conductivity
+    CONDH, // Condensation Humidity
+    SOILH, // Soil Humidity
 };
 
 struct SensorConfig {
