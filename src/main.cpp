@@ -124,7 +124,23 @@ void goToDeepSleep() {
     uint8_t *persist = node.getBufferSession();
     memcpy(LWsession, persist, RADIOLIB_LORAWAN_SESSION_BUF_SIZE);
     
-    Serial.flush();
+    //Poner el PCA9555 en modo sleep antes de apagar
+    ioExpander.sleep();
+    
+    // Apagar todos los reguladores y módulos innecesarios
+    powerManager.allPowerOff();
+    
+    // Deshabilitar el I2C pull-ups internos
+    Wire.setPins(I2C_SDA_PIN, I2C_SCL_PIN);
+    Wire.end();
+    
+    // Configurar pines I2C como INPUT para evitar fugas
+    pinMode(I2C_SDA_PIN, INPUT);
+    pinMode(I2C_SCL_PIN, INPUT);
+    
+    // Apagar módulos
+    radio.sleep(true);
+    btStop();
     
     // Configurar el temporizador y GPIO para despertar
     esp_sleep_enable_timer_wakeup(timeToSleep * 1000000ULL);
@@ -132,13 +148,12 @@ void goToDeepSleep() {
     esp_sleep_enable_gpio_wakeup();
     esp_deep_sleep_enable_gpio_wakeup(BIT(CONFIG_PIN), ESP_GPIO_WAKEUP_GPIO_LOW);
     
-    // Apagar todos los reguladores y módulos innecesarios
-    powerManager.allPowerOff();
-    radio.sleep(false);
-    btStop();
-    Wire.end();
-    spi.end();
     
+    // Flush Serial antes de dormir
+    Serial.flush();
+    Serial.end();
+    
+    // Entrar en deep sleep
     esp_deep_sleep_start();
 }
 

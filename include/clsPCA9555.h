@@ -16,6 +16,8 @@
 
 #define DEBUG 1
 
+#include "config.h"
+
 /** enum with names of ports ED0 - ED15 */
 enum {
     ED0, ED1, ED2 , ED3 , ED4 , ED5 , ED6 , ED7 ,
@@ -46,6 +48,7 @@ public:
     uint8_t stateOfPin(uint8_t pin);                     // Actual ISR
     void setClock(uint32_t clockFrequency);              // Clock speed
     bool begin();                                        // Checks if PCA is responsive
+    void sleep();
 
 private:
     static PCA9555* instancePointer;

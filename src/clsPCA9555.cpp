@@ -305,3 +305,30 @@ void PCA9555::I2CSetValue(uint8_t address, uint8_t reg, uint8_t value){
     Wire.write(value);                            // write config register low byte
     _error = Wire.endTransmission();
 }
+
+void PCA9555::sleep() {
+    // Primero aseguramos que todos los pines estén en LOW
+    _valueRegister = 0x0000;  // Todos los pines en LOW
+    I2CSetValue(_address, NXP_OUTPUT, _valueRegister_low);
+    I2CSetValue(_address, NXP_OUTPUT + 1, _valueRegister_high);
+    
+    // Configuramos los pines críticos como OUTPUT (0) y el resto como INPUT (1)
+    _configurationRegister = 0xFFFF;  // Primero todos como INPUT
+    
+    // Configurar pines de poder como OUTPUT manteniendo LOW
+    _configurationRegister &= ~(1 << POWER_3V3_PIN);  // 3.3V pin como OUTPUT
+    _configurationRegister &= ~(1 << POWER_12V_PIN);  // 12V pin como OUTPUT
+    _configurationRegister &= ~(1 << POWER_2V5_PIN);  // 2.5V pin como OUTPUT
+    
+    // Configurar otros pines críticos como OUTPUT
+    _configurationRegister &= ~(1 << CONFIG_LED_PIN);    // LED de config
+    _configurationRegister &= ~(1 << PT100_CS_PIN);      // CS del PT100
+    _configurationRegister &= ~(1 << ADC_CS_PIN);        // CS del ADC
+    _configurationRegister &= ~(1 << ADC_DRDY_PIN);      // DRDY del ADC
+    _configurationRegister &= ~(1 << ADC_RST_PIN);       // RST del ADC
+    _configurationRegister &= ~(1 << FLOW_SENSOR_PIN);   // Pin del sensor de flujo
+    
+    // Escribir la configuración final
+    I2CSetValue(_address, NXP_CONFIG, _configurationRegister_low);
+    I2CSetValue(_address, NXP_CONFIG + 1, _configurationRegister_high);
+}
