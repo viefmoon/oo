@@ -12,7 +12,7 @@
 #include <DallasTemperature.h>
 #include <vector>
 #include <ArduinoJson.h>
-#include <cmath>  // Agregar para usar pow() y round()
+#include <cmath>
 
 // Bibliotecas específicas del proyecto
 #include "config.h"
@@ -34,6 +34,8 @@
 #include "ble_config_callbacks.h"
 #include "utilities.h"
 #include "ble_service.h"  
+#include "deep_sleep_config.h"
+#include "ModbusManager.h"  // Incluir el nuevo header
 
 /*-------------------------------------------------------------------------------------------------
    Declaración de funciones
@@ -118,25 +120,28 @@ Preferences store;
  * @brief Entra en modo deep sleep después de apagar periféricos y poner en reposo el módulo LoRa.
  */
 void goToDeepSleep() {
-    Serial.println("Entrando en Deep Sleep...");
     
-    // Guardar sesión en RTC
+    // Guardar sesión en RTC y otras rutinas de apagado
     uint8_t *persist = node.getBufferSession();
     memcpy(LWsession, persist, RADIOLIB_LORAWAN_SESSION_BUF_SIZE);
     
-    //Poner el PCA9555 en modo sleep antes de apagar
+    // Poner el PCA9555 en modo sleep
     ioExpander.sleep();
     
-    // Apagar todos los reguladores y módulos innecesarios
+    // Apagar todos los reguladores
     powerManager.allPowerOff();
     
-    // Deshabilitar el I2C pull-ups internos
-    Wire.setPins(I2C_SDA_PIN, I2C_SCL_PIN);
+    // Deshabilitar I2C y SPI
     Wire.end();
+    spi.end();
     
-    // Configurar pines I2C como INPUT para evitar fugas
-    pinMode(I2C_SDA_PIN, INPUT);
-    pinMode(I2C_SCL_PIN, INPUT);
+    // Flush Serial antes de dormir
+    Serial.flush();
+    Serial.end();
+    
+    // Cerrar Serial1 (Modbus)
+    Serial1.flush();
+    Serial1.end();
     
     // Apagar módulos
     radio.sleep(true);
@@ -147,11 +152,7 @@ void goToDeepSleep() {
     gpio_wakeup_enable((gpio_num_t)CONFIG_PIN, GPIO_INTR_LOW_LEVEL);
     esp_sleep_enable_gpio_wakeup();
     esp_deep_sleep_enable_gpio_wakeup(BIT(CONFIG_PIN), ESP_GPIO_WAKEUP_GPIO_LOW);
-    
-    
-    // Flush Serial antes de dormir
-    Serial.flush();
-    Serial.end();
+    setUnusedPinsHighImpedance();
     
     // Entrar en deep sleep
     esp_deep_sleep_start();
@@ -224,6 +225,10 @@ void initHardware() {
 -------------------------------------------------------------------------------------------------*/
 void setup() {
     Serial.begin(115200);
+    
+    // Liberar el hold de los pines no excluidos si se está saliendo de deep sleep.
+    restoreUnusedPinsState();
+    
     pinMode(CONFIG_PIN, INPUT);
 
     // // Inicialización del NVS y de hardware I2C/IO
@@ -306,6 +311,20 @@ void loop() {
     for (const auto& sensor : enabledSensors) {
         readings.push_back(SensorManager::getSensorReading(sensor));
     }
+    
+    // Inicializar y leer sensor Modbus (dirección 1)
+    Serial.println("Inicializando comunicación Modbus a 9600 baudios...");
+    ModbusManager::begin(9600);
+    
+    // Leer sensor Modbus en dirección 1
+    Serial.println("Leyendo sensor Modbus en dirección 1...");
+    Sensor4in1Data modbusData = ModbusManager::readSensor4in1(1);
+    
+    // Convertir datos Modbus a lecturas de sensores y añadirlas al vector
+    std::vector<SensorReading> modbusReadings = ModbusManager::convertToSensorReadings(modbusData, 1);
+    
+    // Añadir lecturas Modbus al vector principal
+    readings.insert(readings.end(), modbusReadings.begin(), modbusReadings.end());
     
     // Enviar el payload fragmentado
     sendFragmentedPayload(readings);

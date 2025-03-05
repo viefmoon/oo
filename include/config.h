@@ -19,19 +19,11 @@
 #define SPI_MOSI_PIN    7     // Pin MOSI (Master Out Slave In)
 
 // Pines para pt100 y PowerManager
-#define PT100_CS_PIN    P04        // Fuente de 3.3V para sensores en IO0_0
+#define PT100_CS_PIN    P03        // Fuente de 3.3V para sensores en IO0_0
 #define POWER_3V3_PIN   P00        // Fuente de 3.3V para sensores en IO0_0
 #define POWER_12V_PIN   P01        // Fuente de 12V en IO0_1
 #define POWER_2V5_PIN   P02        // Fuente de 2.5V y -2.5 en IO0_2
-#define POWER_STABILIZE_DELAY 100   // Tiempo de estabilización en ms
-
-// Pines para ADC m04
-#define ADC1_CS_PIN    P05
-#define ADC1_DRDY_PIN  P06
-#define ADC1_RST_PIN   P07
-#define ADC2_CS_PIN    P10
-#define ADC2_DRDY_PIN  P11
-#define ADC2_RST_PIN   P12
+#define POWER_STABILIZE_DELAY 20   // Tiempo de estabilización en ms
 
 // Pines para ADC m08
 #define ADC_CS_PIN    P05
@@ -67,8 +59,8 @@
 #define DEFAULT_TIME_TO_SLEEP   30       // Tiempo de sueño en segundos 
 
 // ID por defecto del dispositivo
-#define DEFAULT_DEVICE_ID "DEVICE_001"
-#define DEFAULT_STATION_ID "STATION_001"
+#define DEFAULT_DEVICE_ID "DEV001"
+#define DEFAULT_STATION_ID "ST001"
 
 // ==========================================================
 //                  CALIBRACIONES

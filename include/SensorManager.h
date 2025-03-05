@@ -73,7 +73,7 @@ class SensorManager {
     static void saveNTCCalibration(bool is100K, double T1, double R1, double T2, double R2, double T3, double R3);
     static void saveConductivityCalibration(float calTemp, float coefComp, float V1, float T1, float V2, float T2, float V3, float T3);
     static void initializePreferences();
-    static void initializeSPIPins();
+    static void initializeSPISSPins();
 };
 
 #endif // SENSOR_MANAGER_H

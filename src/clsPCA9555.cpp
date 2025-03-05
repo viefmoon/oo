@@ -98,8 +98,7 @@ bool PCA9555::begin() {
             I2CSetValue(_address, NXP_CONFIG, _configurationRegister_low);
             delay(5);
             I2CSetValue(_address, NXP_CONFIG + 1, _configurationRegister_high);
-            
-            Serial.println("PCA9555 inicializado correctamente en la dirección 0x" + String(_address, HEX));
+
             return true;
         }
         
@@ -312,23 +311,10 @@ void PCA9555::sleep() {
     I2CSetValue(_address, NXP_OUTPUT, _valueRegister_low);
     I2CSetValue(_address, NXP_OUTPUT + 1, _valueRegister_high);
     
-    // Configuramos los pines críticos como OUTPUT (0) y el resto como INPUT (1)
-    _configurationRegister = 0xFFFF;  // Primero todos como INPUT
+    // Configuramos todos los pines como INPUT
+    _configurationRegister = 0xFFFF;  // 0xFFFF indica que todos los pines son INPUT
     
-    // Configurar pines de poder como OUTPUT manteniendo LOW
-    _configurationRegister &= ~(1 << POWER_3V3_PIN);  // 3.3V pin como OUTPUT
-    _configurationRegister &= ~(1 << POWER_12V_PIN);  // 12V pin como OUTPUT
-    _configurationRegister &= ~(1 << POWER_2V5_PIN);  // 2.5V pin como OUTPUT
-    
-    // Configurar otros pines críticos como OUTPUT
-    _configurationRegister &= ~(1 << CONFIG_LED_PIN);    // LED de config
-    _configurationRegister &= ~(1 << PT100_CS_PIN);      // CS del PT100
-    _configurationRegister &= ~(1 << ADC_CS_PIN);        // CS del ADC
-    _configurationRegister &= ~(1 << ADC_DRDY_PIN);      // DRDY del ADC
-    _configurationRegister &= ~(1 << ADC_RST_PIN);       // RST del ADC
-    _configurationRegister &= ~(1 << FLOW_SENSOR_PIN);   // Pin del sensor de flujo
-    
-    // Escribir la configuración final
+    // Escribimos la configuración final
     I2CSetValue(_address, NXP_CONFIG, _configurationRegister_low);
     I2CSetValue(_address, NXP_CONFIG + 1, _configurationRegister_high);
 }

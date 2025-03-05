@@ -13,14 +13,14 @@
 // =============== Implementaciones de los métodos de SensorManager ===============
 
 void SensorManager::beginSensors() {
-    // Inicializar pines de SPI (CS) y luego SPI
-    initializeSPIPins();
+    // Inicializar pines de SPI (SS) y luego SPI
+    initializeSPISSPins();
     spi.begin(SPI_SCK_PIN, SPI_MISO_PIN, SPI_MOSI_PIN);
 
-    // Encender alimentación 3.3V (si lo maneja el PowerManager)
+    // Encender alimentación 3.3V
     powerManager.power3V3On();
 
-    // Inicializar RTD (MAX31865)
+    // Inicializar RTD Y configurarlo
     rtd.begin();
     {
         bool vBias = true;
@@ -35,9 +35,9 @@ void SensorManager::beginSensors() {
         rtd.configure(vBias, autoConvert, oneShot, threeWire, faultCycle, faultClear, filter50Hz, lowTh, highTh);
     }
 
-    // Inicializar ADC 08
+    // Inicializar ADC
     adc.begin(ADC_CS_PIN, ADC_DRDY_PIN, ADC_RST_PIN);
-    adc.hardReset();
+    adc.hardReset(); //garantiza que el ADC esté en estado inicial
     delay(10);
     adc.setPowerMode(POWER_MODE_HIGH_RESOLUTION);
     adc.setOsr(OSR_16384);
@@ -51,18 +51,18 @@ void SensorManager::beginSensors() {
     dallasTemp.getTempCByIndex(0);
 }
 
-void SensorManager::initializeSPIPins() {
+void SensorManager::initializeSPISSPins() {
     // Inicializar SS del LORA que está conectado directamente al ESP32
     pinMode(LORA_NSS_PIN, OUTPUT);
     digitalWrite(LORA_NSS_PIN, HIGH);
 
     // Inicializar SS conectados al expansor I2C
-    ioExpander.pinMode(P03, OUTPUT);  
-    ioExpander.pinMode(P05, OUTPUT);  
+    ioExpander.pinMode(PT100_CS_PIN, OUTPUT);  
+    ioExpander.pinMode(ADC_CS_PIN, OUTPUT);  
 
     // Establecer todos los SS del expansor en HIGH
-    ioExpander.digitalWrite(P03, HIGH);
-    ioExpander.digitalWrite(P05, HIGH);
+    ioExpander.digitalWrite(PT100_CS_PIN, HIGH);
+    ioExpander.digitalWrite(ADC_CS_PIN, HIGH);
 }
 
 // ========== Funciones de conversión ==========
@@ -137,7 +137,7 @@ float convertHDS10(float voltage) {
 
 float convertSoilMoisture(float voltage) {
     
-    const float SOIL_MOISTURE_FULL_SCALE_V = 1.17f;
+    const float SOIL_MOISTURE_FULL_SCALE_V = 1.17f; //voltaje máximo de la sonda
     const float slope = 100.0f / SOIL_MOISTURE_FULL_SCALE_V;
     float humidity = voltage * slope;
     humidity = constrain(humidity, 0.0f, 100.0f);
@@ -180,8 +180,8 @@ float convertConductivity(float voltage, float solutionTemp) {
 }
 
 float convertBattery(float voltage) {
-    
-    const double R1 = 470000.0;
+    //divisor de voltaje
+    const double R1 = 470000.0; //resistencias fija
     const double R2 = 1500000.0;
     const double conversionFactor = (R1 + R2) / R1;
     float batteryVoltage = (float)(voltage * conversionFactor);

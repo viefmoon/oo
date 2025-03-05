@@ -3,6 +3,13 @@
     "string_view": "cpp",
     "unordered_map": "cpp",
     "unordered_set": "cpp",
-    "string": "cpp"
+    "string": "cpp",
+    "array": "cpp",
+    "*.tcc": "cpp",
+    "deque": "cpp",
+    "vector": "cpp",
+    "memory": "cpp",
+    "random": "cpp",
+    "initializer_list": "cpp"
   }
 }

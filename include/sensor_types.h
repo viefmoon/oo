@@ -13,6 +13,13 @@ enum SensorType {
     COND, // Conductivity
     CONDH, // Condensation Humidity
     SOILH, // Soil Humidity
+    MB_TEMP, // Modbus Temperature
+    MB_HUM, // Modbus Humidity
+    MB_NOISE, // Modbus Noise
+    MB_PM25, // Modbus PM2.5
+    MB_PM10, // Modbus PM10
+    MB_PRES, // Modbus Pressure
+    MB_ILLUM, // Modbus Illuminance
 };
 
 struct SensorConfig {
